@@ -1,0 +1,57 @@
+{
+  "manifest_version": 3,
+  "name": "Kops Filter Exporter",
+  "version": "1.0.0",
+  "description": "Extract and export filters from V-Tools and Souk.to as universal CSV — by Kops, the fastest Vinted monitor",
+  "homepage_url": "https://getkops.com",
+  "author": "Kops",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://app.v-tools.com/*",
+        "*://*.v-tools.com/*"
+      ],
+      "js": ["src/content.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "*://souk.to/*",
+        "*://*.souk.to/*"
+      ],
+      "js": ["src/content.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["src/inject.js"],
+      "matches": [
+        "*://app.v-tools.com/*",
+        "*://*.v-tools.com/*",
+        "*://souk.to/*",
+        "*://*.souk.to/*"
+      ]
+    }
+  ]
+}
