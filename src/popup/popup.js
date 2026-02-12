@@ -1,39 +1,59 @@
 /**
- * popup.js — Popup UI logic for the Filter Exporter extension.
+ * popup.js — Popup UI logic for the Kops Filter Exporter extension.
+ * Handles filter display, CSV export, and live updates with comprehensive error handling.
  */
 
 (function () {
   'use strict';
 
-  // ─── DOM Elements ──────────────────────────────────────────────
-  const statusBar = document.getElementById('statusBar');
-  const statusDot = document.getElementById('statusDot');
-  const statusText = document.getElementById('statusText');
-  const statusBadge = document.getElementById('statusBadge');
-  const emptyState = document.getElementById('emptyState');
-  const filterTable = document.getElementById('filterTable');
-  const filterTableBody = document.getElementById('filterTableBody');
-  const exportBtn = document.getElementById('exportBtn');
-  const clearBtn = document.getElementById('clearBtn');
-  const lastUpdate = document.getElementById('lastUpdate');
+  // ─── DOM References ───────────────────────────────────────────
 
-  // ─── CSV Generation (inline for popup context) ────────────────
+  const $ = (id) => document.getElementById(id);
+
+  const statusBar = $('statusBar');
+  const statusText = $('statusText');
+  const statusBadge = $('statusBadge');
+  const errorBanner = $('errorBanner');
+  const errorText = $('errorText');
+  const loadingState = $('loadingState');
+  const emptyState = $('emptyState');
+  const filterTable = $('filterTable');
+  const filterTableBody = $('filterTableBody');
+  const exportBtn = $('exportBtn');
+  const clearBtn = $('clearBtn');
+  const lastUpdateEl = $('lastUpdate');
+
+  // ─── State ────────────────────────────────────────────────────
+
+  let isExporting = false;
+
+  // ─── CSV Generation ───────────────────────────────────────────
 
   const CSV_COLUMNS = [
     'source', 'name', 'search_text', 'price_from', 'price_to',
-    'catalogs', 'brands', 'sizes', 'statuses', 'colors',
-    'materials', 'countries', 'enabled',
+    'catalogs', 'catalog_ids',
+    'brands', 'brand_ids',
+    'sizes', 'size_ids',
+    'statuses', 'status_ids',
+    'colors', 'color_ids',
+    'materials', 'material_ids',
+    'countries', 'country_ids',
+    'enabled',
   ];
 
   function escapeCsvValue(value) {
-    const str = String(value ?? '');
-    if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('|')) {
+    let str = String(value ?? '');
+    str = str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+    str = str.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    str = str.replace(/[\u200B\u200C\u200D\uFEFF\u2060]/g, '');
+    if (/[,"\n\t;|]/.test(str) || /[^\x20-\x7E]/.test(str)) {
       return '"' + str.replace(/"/g, '""') + '"';
     }
     return str;
   }
 
   function filtersToCSV(filters) {
+    if (!Array.isArray(filters) || filters.length === 0) return '';
     const header = CSV_COLUMNS.join(',');
     const rows = filters.map((filter) =>
       CSV_COLUMNS.map((col) => escapeCsvValue(filter[col])).join(',')
@@ -42,67 +62,118 @@
   }
 
   function downloadCSV(csvString, filename) {
-    const bom = '\uFEFF';
-    const blob = new Blob([bom + csvString], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-      URL.revokeObjectURL(url);
-      a.remove();
-    }, 100);
+    try {
+      const bom = '\uFEFF';
+      const blob = new Blob([bom + csvString], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+        a.remove();
+      }, 200);
+    } catch (err) {
+      console.error('[Kops Filter Exporter] CSV download failed:', err);
+      showToast('Download failed — check console', 'error');
+    }
   }
 
-  // ─── Load Filters ─────────────────────────────────────────────
+  // ─── Communication ────────────────────────────────────────────
 
-  function loadFilters() {
-    chrome.runtime.sendMessage({ action: 'GET_FILTERS' }, (response) => {
-      if (chrome.runtime.lastError) {
-        console.warn('[Filter Exporter] Error:', chrome.runtime.lastError);
-        return;
-      }
-
-      const { filters, lastSource, lastUpdate: updated } = response;
-
-      if (filters && filters.length > 0) {
-        renderFilters(filters, lastSource, updated);
-      } else {
-        renderEmpty();
+  /**
+   * Send a message to the service worker with error handling.
+   * @param {object} message
+   * @returns {Promise<object>}
+   */
+  function sendMessage(message) {
+    return new Promise((resolve, reject) => {
+      try {
+        chrome.runtime.sendMessage(message, (response) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+            return;
+          }
+          resolve(response || {});
+        });
+      } catch (err) {
+        reject(err);
       }
     });
   }
 
-  // ─── Render Filters ───────────────────────────────────────────
+  // ─── UI State Transitions ────────────────────────────────────
 
-  function renderFilters(filters, source, updated) {
-    // Status bar
-    statusBar.classList.add('active');
-    statusText.textContent = `${source} — ${filters.length} filter${filters.length > 1 ? 's' : ''} captured`;
-    statusBadge.textContent = String(filters.length);
+  function showLoading() {
+    loadingState.style.display = 'flex';
+    emptyState.style.display = 'none';
+    filterTable.style.display = 'none';
+    hideError();
+  }
 
-    // Show table, hide empty state
+  function showEmpty() {
+    loadingState.style.display = 'none';
+    emptyState.style.display = 'flex';
+    filterTable.style.display = 'none';
+    statusBar.classList.remove('active');
+    statusText.textContent = 'Waiting for data…';
+    statusBadge.textContent = '0';
+    exportBtn.disabled = true;
+    clearBtn.disabled = true;
+    lastUpdateEl.textContent = '';
+  }
+
+  function showError(message) {
+    errorBanner.style.display = 'flex';
+    errorText.textContent = message;
+  }
+
+  function hideError() {
+    errorBanner.style.display = 'none';
+    errorText.textContent = '';
+  }
+
+  // ─── Render Filters ──────────────────────────────────────────
+
+  function renderFilters(filters, source, updated, errors) {
+    // Hide loading, show table
+    loadingState.style.display = 'none';
     emptyState.style.display = 'none';
     filterTable.style.display = 'table';
 
-    // Clear and populate table
+    // Status bar
+    statusBar.classList.add('active');
+    const count = filters.length;
+    statusText.textContent = `${source} — ${count} filter${count !== 1 ? 's' : ''} captured`;
+    statusBadge.textContent = String(count);
+
+    // Show warning if there were parse errors
+    if (errors && errors.length > 0) {
+      showError(`${errors.length} warning${errors.length !== 1 ? 's' : ''} during parsing`);
+    } else {
+      hideError();
+    }
+
+    // Build table rows
     filterTableBody.innerHTML = '';
+
+    const fragment = document.createDocumentFragment();
     filters.forEach((filter) => {
       const tr = document.createElement('tr');
 
-      // Name
+      // Name cell
       const tdName = document.createElement('td');
       const nameSpan = document.createElement('span');
       nameSpan.className = 'filter-name';
-      nameSpan.textContent = filter.name;
-      nameSpan.title = filter.name;
+      nameSpan.textContent = filter.name || '(unnamed)';
+      nameSpan.title = filter.name || '';
       tdName.appendChild(nameSpan);
       tr.appendChild(tdName);
 
-      // Brands
+      // Brands cell
       const tdBrands = document.createElement('td');
       const brandsSpan = document.createElement('span');
       brandsSpan.className = 'filter-brands';
@@ -111,47 +182,73 @@
       tdBrands.appendChild(brandsSpan);
       tr.appendChild(tdBrands);
 
-      // Price
+      // Price cell
       const tdPrice = document.createElement('td');
       const priceSpan = document.createElement('span');
       priceSpan.className = 'filter-price';
-      const from = filter.price_from !== '' ? filter.price_from : '0';
-      const to = filter.price_to !== '' ? filter.price_to : '∞';
+      const from = filter.price_from !== '' && filter.price_from != null ? filter.price_from : '0';
+      const to = filter.price_to !== '' && filter.price_to != null ? filter.price_to : '∞';
       priceSpan.textContent = `€${from}–${to}`;
       tdPrice.appendChild(priceSpan);
       tr.appendChild(tdPrice);
 
-      // Status
+      // Status cell
       const tdStatus = document.createElement('td');
       const badge = document.createElement('span');
-      badge.className = `badge ${filter.enabled === 'yes' ? 'badge-active' : 'badge-inactive'}`;
-      badge.textContent = filter.enabled === 'yes' ? 'Active' : 'Off';
+      const isActive = filter.enabled === 'yes';
+      badge.className = `badge ${isActive ? 'badge-active' : 'badge-inactive'}`;
+      badge.textContent = isActive ? 'Active' : 'Off';
       tdStatus.appendChild(badge);
       tr.appendChild(tdStatus);
 
-      filterTableBody.appendChild(tr);
+      fragment.appendChild(tr);
     });
+
+    filterTableBody.appendChild(fragment);
 
     // Enable buttons
     exportBtn.disabled = false;
     clearBtn.disabled = false;
 
-    // Footer
+    // Footer timestamp
     if (updated) {
-      const date = new Date(updated);
-      lastUpdate.textContent = `Last capture: ${date.toLocaleTimeString()}`;
+      try {
+        const date = new Date(updated);
+        if (!isNaN(date.getTime())) {
+          lastUpdateEl.textContent = `Last capture: ${date.toLocaleTimeString()}`;
+        }
+      } catch (e) {
+        lastUpdateEl.textContent = '';
+      }
     }
   }
 
-  function renderEmpty() {
-    statusBar.classList.remove('active');
-    statusText.textContent = 'Waiting for data…';
-    statusBadge.textContent = '0';
-    emptyState.style.display = 'flex';
-    filterTable.style.display = 'none';
-    exportBtn.disabled = true;
-    clearBtn.disabled = true;
-    lastUpdate.textContent = '';
+  // ─── Load Filters ────────────────────────────────────────────
+
+  async function loadFilters() {
+    showLoading();
+
+    try {
+      const response = await sendMessage({ action: 'GET_FILTERS' });
+
+      if (!response.ok && response.error) {
+        showEmpty();
+        showError(response.error);
+        return;
+      }
+
+      const { filters, lastSource, lastUpdate, lastErrors } = response;
+
+      if (Array.isArray(filters) && filters.length > 0) {
+        renderFilters(filters, lastSource, lastUpdate, lastErrors);
+      } else {
+        showEmpty();
+      }
+    } catch (err) {
+      console.error('[Kops Filter Exporter] Failed to load filters:', err);
+      showEmpty();
+      showError('Could not connect to service worker');
+    }
   }
 
   // ─── Toast ────────────────────────────────────────────────────
@@ -165,6 +262,7 @@
     toast.textContent = message;
     document.body.appendChild(toast);
 
+    // Force reflow then animate in
     requestAnimationFrame(() => {
       toast.classList.add('show');
     });
@@ -172,36 +270,63 @@
     setTimeout(() => {
       toast.classList.remove('show');
       setTimeout(() => toast.remove(), 300);
-    }, 2000);
+    }, 2500);
   }
 
   // ─── Event Listeners ─────────────────────────────────────────
 
-  exportBtn.addEventListener('click', () => {
-    chrome.runtime.sendMessage({ action: 'GET_FILTERS' }, (response) => {
-      if (chrome.runtime.lastError || !response.filters?.length) {
+  exportBtn.addEventListener('click', async () => {
+    if (isExporting) return;
+    isExporting = true;
+    exportBtn.disabled = true;
+
+    try {
+      const response = await sendMessage({ action: 'GET_FILTERS' });
+
+      if (!response.filters || response.filters.length === 0) {
         showToast('No filters to export');
         return;
       }
 
       const csv = filtersToCSV(response.filters);
-      const source = (response.lastSource || 'filters').toLowerCase().replace(/[^a-z0-9]/g, '_');
+      if (!csv) {
+        showToast('Failed to generate CSV');
+        return;
+      }
+
+      const source = (response.lastSource || 'filters')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '_');
       const timestamp = new Date().toISOString().slice(0, 10);
       const filename = `${source}_filters_${timestamp}.csv`;
 
       downloadCSV(csv, filename);
       showToast(`Exported ${response.filters.length} filters`, 'success');
-    });
+    } catch (err) {
+      console.error('[Kops Filter Exporter] Export failed:', err);
+      showToast('Export failed — try again', 'error');
+    } finally {
+      isExporting = false;
+      exportBtn.disabled = false;
+    }
   });
 
-  clearBtn.addEventListener('click', () => {
-    chrome.runtime.sendMessage({ action: 'CLEAR_FILTERS' }, () => {
-      renderEmpty();
+  clearBtn.addEventListener('click', async () => {
+    clearBtn.disabled = true;
+
+    try {
+      await sendMessage({ action: 'CLEAR_FILTERS' });
+      showEmpty();
+      hideError();
       showToast('Filters cleared');
-    });
+    } catch (err) {
+      console.error('[Kops Filter Exporter] Clear failed:', err);
+      showToast('Clear failed — try again', 'error');
+      clearBtn.disabled = false;
+    }
   });
 
-  // ─── Listen for live updates from background ──────────────────
+  // ─── Live Updates ─────────────────────────────────────────────
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'local' && changes.filters) {

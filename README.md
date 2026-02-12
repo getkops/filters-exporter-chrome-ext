@@ -49,9 +49,10 @@ Kops Filter Exporter silently intercepts the filters/alerts API responses when y
 ## CSV format
 
 ```
-source,name,search_text,price_from,price_to,catalogs,brands,sizes,statuses,colors,materials,countries,enabled
+source,name,search_text,price_from,price_to,catalogs,catalog_ids,brands,brand_ids,sizes,size_ids,statuses,status_ids,colors,color_ids,materials,material_ids,countries,country_ids,enabled
 ```
 
+- Each name column (e.g. `brands`) is paired with an `_ids` column (e.g. `brand_ids`) containing the Vinted IDs — ready for programmatic import into [Kops](https://getkops.com)
 - Multi-value fields are separated with `|`
 - UTF-8 BOM included for Excel compatibility
 - Filename includes source and date: `v_tools_filters_2026-02-12.csv`

@@ -1,16 +1,44 @@
 /**
- * souk.js — Parser for Souk.to filter API response.
- *
- * Souk.to response structure:
- * {
- *   type: "success",
- *   body: {
- *     alerts: [{ name, search_text, price_from, price_to, catalogs: [{id, title}], brands, sizes, colors, status, is_deactivated, ... }],
- *     pagination: { ... }
- *   }
- * }
+ * parsers/souk.js — Souk.to API response parser.
+ * Normalizes alert data into the universal flat format.
  */
 
+/**
+ * Safely join array items by a key.
+ * @param {Array} arr
+ * @param {string} key
+ * @returns {string}
+ */
+function joinField(arr, key) {
+  if (!Array.isArray(arr) || arr.length === 0) return '';
+  return arr
+    .filter((item) => item != null && item[key] != null)
+    .map((item) => String(item[key]))
+    .join(' | ');
+}
+
+/**
+ * Safely join array item IDs.
+ * @param {Array} arr
+ * @returns {string}
+ */
+function joinIds(arr) {
+  if (!Array.isArray(arr) || arr.length === 0) return '';
+  return arr
+    .filter((item) => item != null && item.id != null)
+    .map((item) => String(item.id))
+    .join(' | ');
+}
+
+function safeArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+/**
+ * Parse Souk.to API response into normalized filters.
+ * @param {object} response - Raw API response
+ * @returns {Array} Normalized filter objects
+ */
 export function parseSoukFilters(response) {
   const alerts = response?.body?.alerts;
 
@@ -19,24 +47,28 @@ export function parseSoukFilters(response) {
     return [];
   }
 
-  return alerts.map((alert) => ({
-    source: 'Souk.to',
-    name: alert.name || '',
-    search_text: alert.search_text || '',
-    price_from: alert.price_from ?? '',
-    price_to: alert.price_to ?? '',
-    catalogs: joinField(alert.catalogs, 'title'),
-    brands: joinField(alert.brands, 'title'),
-    sizes: joinField(alert.sizes, 'title'),
-    statuses: joinField(alert.status, 'title'),
-    colors: joinField(alert.colors, 'title'),
-    materials: '',
-    countries: '',
-    enabled: alert.is_deactivated ? 'no' : 'yes',
-  }));
-}
-
-function joinField(arr, key) {
-  if (!Array.isArray(arr) || arr.length === 0) return '';
-  return arr.map((item) => item[key] || '').join(' | ');
+  return alerts
+    .filter((alert) => alert && alert.name)
+    .map((alert) => ({
+      source: 'Souk.to',
+      name: String(alert.name),
+      search_text: String(alert.search_text ?? ''),
+      price_from: alert.price_from ?? '',
+      price_to: alert.price_to ?? '',
+      catalogs: joinField(safeArray(alert.catalogs), 'title'),
+      catalog_ids: joinIds(safeArray(alert.catalogs)),
+      brands: joinField(safeArray(alert.brands), 'title'),
+      brand_ids: joinIds(safeArray(alert.brands)),
+      sizes: joinField(safeArray(alert.sizes), 'title'),
+      size_ids: joinIds(safeArray(alert.sizes)),
+      statuses: joinField(safeArray(alert.status), 'title'),
+      status_ids: joinIds(safeArray(alert.status)),
+      colors: joinField(safeArray(alert.colors), 'title'),
+      color_ids: joinIds(safeArray(alert.colors)),
+      materials: '',
+      material_ids: '',
+      countries: '',
+      country_ids: '',
+      enabled: alert.is_deactivated === true ? 'no' : 'yes',
+    }));
 }

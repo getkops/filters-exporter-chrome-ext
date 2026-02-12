@@ -1,78 +1,245 @@
 /**
- * background.js — Service worker for the Filter Exporter extension.
- * Receives intercepted API data from content scripts, parses it,
+ * background.js — Service worker for the Kops Filter Exporter extension.
+ * Receives intercepted API data from content scripts, parses and validates it,
  * stores normalized filters, and serves data to the popup.
  */
 
-// ─── Inline parsers (service workers can't use ES module imports) ──
+const LOG_PREFIX = '[Kops Filter Exporter]';
 
+// ─── Utility ───────────────────────────────────────────────────────
+
+/**
+ * Safely join array items by a key, returning a pipe-delimited string.
+ * @param {Array} arr
+ * @param {string} key
+ * @returns {string}
+ */
 function joinField(arr, key) {
   if (!Array.isArray(arr) || arr.length === 0) return '';
-  return arr.map((item) => item[key] || '').join(' | ');
+  return arr
+    .filter((item) => item != null && item[key] != null)
+    .map((item) => String(item[key]))
+    .join(' | ');
 }
 
-function parseVToolsFilters(response) {
-  if (!response?.data || !Array.isArray(response.data)) {
-    console.warn('[Filter Exporter] Invalid V-Tools response structure');
-    return [];
-  }
-  return response.data.map((filter) => ({
+/**
+ * Safely join array item IDs into a pipe-delimited string.
+ * @param {Array} arr
+ * @returns {string}
+ */
+function joinIds(arr) {
+  if (!Array.isArray(arr) || arr.length === 0) return '';
+  return arr
+    .filter((item) => item != null && item.id != null)
+    .map((item) => String(item.id))
+    .join(' | ');
+}
+
+/**
+ * Safely extract an array field from a filter object.
+ * Handles missing fields, nulls, and non-array values.
+ * @param {*} value
+ * @returns {Array}
+ */
+function safeArray(value) {
+  if (Array.isArray(value)) return value;
+  return [];
+}
+
+// ─── Parsers ───────────────────────────────────────────────────────
+
+/**
+ * Validate and normalize a single V-Tools filter object.
+ * @param {object} filter
+ * @returns {object|null} Normalized filter or null if invalid
+ */
+function normalizeVToolsFilter(filter) {
+  if (!filter || typeof filter !== 'object') return null;
+
+  // Name is required — skip unnamed filters
+  const name = filter.name;
+  if (name == null || String(name).trim() === '') return null;
+
+  return {
     source: 'V-Tools',
-    name: filter.name || '',
-    search_text: filter.search_text || '',
+    name: String(name),
+    search_text: String(filter.search_text ?? ''),
     price_from: filter.price_from ?? '',
     price_to: filter.price_to ?? '',
-    catalogs: joinField(filter.catalogs, 'data'),
-    brands: joinField(filter.brands, 'data'),
-    sizes: joinField(filter.sizes, 'data'),
-    statuses: joinField(filter.statuses, 'data'),
-    colors: joinField(filter.colors, 'data'),
-    materials: joinField(filter.materials, 'data'),
-    countries: joinField(filter.countries, 'data'),
-    enabled: filter.enabled ? 'yes' : 'no',
-  }));
+    catalogs: joinField(safeArray(filter.catalogs), 'data'),
+    catalog_ids: joinIds(safeArray(filter.catalogs)),
+    brands: joinField(safeArray(filter.brands), 'data'),
+    brand_ids: joinIds(safeArray(filter.brands)),
+    sizes: joinField(safeArray(filter.sizes), 'data'),
+    size_ids: joinIds(safeArray(filter.sizes)),
+    statuses: joinField(safeArray(filter.statuses), 'data'),
+    status_ids: joinIds(safeArray(filter.statuses)),
+    colors: joinField(safeArray(filter.colors), 'data'),
+    color_ids: joinIds(safeArray(filter.colors)),
+    materials: joinField(safeArray(filter.materials), 'data'),
+    material_ids: joinIds(safeArray(filter.materials)),
+    countries: joinField(safeArray(filter.countries), 'data'),
+    country_ids: joinIds(safeArray(filter.countries)),
+    enabled: filter.enabled === true ? 'yes' : 'no',
+  };
 }
 
-function parseSoukFilters(response) {
-  const alerts = response?.body?.alerts;
-  if (!alerts || !Array.isArray(alerts)) {
-    console.warn('[Filter Exporter] Invalid Souk.to response structure');
-    return [];
+/**
+ * Parse the full V-Tools API response.
+ * @param {object} response
+ * @returns {{ filters: Array, errors: string[] }}
+ */
+function parseVToolsFilters(response) {
+  const errors = [];
+
+  if (!response || typeof response !== 'object') {
+    errors.push('V-Tools response is not an object');
+    return { filters: [], errors };
   }
-  return alerts.map((alert) => ({
+
+  if (response.code !== undefined && response.code !== 0) {
+    errors.push(`V-Tools API returned error code: ${response.code}`);
+  }
+
+  if (!Array.isArray(response.data)) {
+    errors.push('V-Tools response.data is not an array');
+    return { filters: [], errors };
+  }
+
+  const filters = [];
+  response.data.forEach((raw, index) => {
+    const normalized = normalizeVToolsFilter(raw);
+    if (normalized) {
+      filters.push(normalized);
+    } else {
+      errors.push(`V-Tools filter at index ${index} skipped (invalid or unnamed)`);
+    }
+  });
+
+  return { filters, errors };
+}
+
+/**
+ * Validate and normalize a single Souk.to alert object.
+ * @param {object} alert
+ * @returns {object|null}
+ */
+function normalizeSoukFilter(alert) {
+  if (!alert || typeof alert !== 'object') return null;
+
+  const name = alert.name;
+  if (name == null || String(name).trim() === '') return null;
+
+  return {
     source: 'Souk.to',
-    name: alert.name || '',
-    search_text: alert.search_text || '',
+    name: String(name),
+    search_text: String(alert.search_text ?? ''),
     price_from: alert.price_from ?? '',
     price_to: alert.price_to ?? '',
-    catalogs: joinField(alert.catalogs, 'title'),
-    brands: joinField(alert.brands, 'title'),
-    sizes: joinField(alert.sizes, 'title'),
-    statuses: joinField(alert.status, 'title'),
-    colors: joinField(alert.colors, 'title'),
+    catalogs: joinField(safeArray(alert.catalogs), 'title'),
+    catalog_ids: joinIds(safeArray(alert.catalogs)),
+    brands: joinField(safeArray(alert.brands), 'title'),
+    brand_ids: joinIds(safeArray(alert.brands)),
+    sizes: joinField(safeArray(alert.sizes), 'title'),
+    size_ids: joinIds(safeArray(alert.sizes)),
+    statuses: joinField(safeArray(alert.status), 'title'),
+    status_ids: joinIds(safeArray(alert.status)),
+    colors: joinField(safeArray(alert.colors), 'title'),
+    color_ids: joinIds(safeArray(alert.colors)),
     materials: '',
+    material_ids: '',
     countries: '',
-    enabled: alert.is_deactivated ? 'no' : 'yes',
-  }));
+    country_ids: '',
+    enabled: alert.is_deactivated === true ? 'no' : 'yes',
+  };
+}
+
+/**
+ * Parse the full Souk.to API response.
+ * @param {object} response
+ * @returns {{ filters: Array, errors: string[] }}
+ */
+function parseSoukFilters(response) {
+  const errors = [];
+
+  if (!response || typeof response !== 'object') {
+    errors.push('Souk.to response is not an object');
+    return { filters: [], errors };
+  }
+
+  if (response.type !== 'success') {
+    errors.push(`Souk.to API returned type: ${response.type ?? 'undefined'}`);
+  }
+
+  const alerts = response?.body?.alerts;
+  if (!Array.isArray(alerts)) {
+    errors.push('Souk.to response.body.alerts is not an array');
+    return { filters: [], errors };
+  }
+
+  const filters = [];
+  alerts.forEach((raw, index) => {
+    const normalized = normalizeSoukFilter(raw);
+    if (normalized) {
+      filters.push(normalized);
+    } else {
+      errors.push(`Souk.to alert at index ${index} skipped (invalid or unnamed)`);
+    }
+  });
+
+  return { filters, errors };
 }
 
 // ─── CSV Generation ────────────────────────────────────────────────
 
 const CSV_COLUMNS = [
   'source', 'name', 'search_text', 'price_from', 'price_to',
-  'catalogs', 'brands', 'sizes', 'statuses', 'colors',
-  'materials', 'countries', 'enabled',
+  'catalogs', 'catalog_ids',
+  'brands', 'brand_ids',
+  'sizes', 'size_ids',
+  'statuses', 'status_ids',
+  'colors', 'color_ids',
+  'materials', 'material_ids',
+  'countries', 'country_ids',
+  'enabled',
 ];
 
+/**
+ * Sanitize and escape a CSV value for safe output.
+ * Handles: emojis, accented chars, CJK, zero-width chars,
+ * control characters, null bytes, carriage returns, surrogate pairs.
+ * @param {*} value
+ * @returns {string}
+ */
 function escapeCsvValue(value) {
-  const str = String(value ?? '');
-  if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('|')) {
+  let str = String(value ?? '');
+
+  // Strip null bytes and control characters (keep \n and \t)
+  str = str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+
+  // Normalize line endings: \r\n → \n, lone \r → \n
+  str = str.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  // Strip zero-width chars that can corrupt files
+  str = str.replace(/[\u200B\u200C\u200D\uFEFF\u2060]/g, '');
+
+  // Quote if it contains: comma, double-quote, newline, pipe, tab,
+  // semicolon (some locales), or any non-ASCII character (emoji, accented, CJK, etc.)
+  // eslint-disable-next-line no-control-regex
+  if (/[,"\n\t;|]/.test(str) || /[^\x20-\x7E]/.test(str)) {
     return '"' + str.replace(/"/g, '""') + '"';
   }
+
   return str;
 }
 
+/**
+ * Convert normalized filters into a CSV string.
+ * @param {Array} filters
+ * @returns {string}
+ */
 function filtersToCSV(filters) {
+  if (!Array.isArray(filters) || filters.length === 0) return '';
   const header = CSV_COLUMNS.join(',');
   const rows = filters.map((filter) =>
     CSV_COLUMNS.map((col) => escapeCsvValue(filter[col])).join(',')
@@ -80,80 +247,193 @@ function filtersToCSV(filters) {
   return [header, ...rows].join('\n');
 }
 
-// ─── Message Handler ───────────────────────────────────────────────
+// ─── Storage Helpers ───────────────────────────────────────────────
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === 'FILTERS_INTERCEPTED') {
-    handleInterceptedFilters(message.source, message.data);
-    sendResponse({ ok: true });
-    return false;
-  }
-
-  if (message.action === 'GET_FILTERS') {
-    chrome.storage.local.get(['filters', 'lastSource', 'lastUpdate'], (result) => {
-      sendResponse({
-        filters: result.filters || [],
-        lastSource: result.lastSource || null,
-        lastUpdate: result.lastUpdate || null,
-      });
+/**
+ * Save filters and metadata to chrome.storage.local.
+ * @param {object} data
+ * @returns {Promise<void>}
+ */
+function saveToStorage(data) {
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.set(data, () => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+      } else {
+        resolve();
+      }
     });
-    return true; // async response
-  }
+  });
+}
 
-  if (message.action === 'EXPORT_CSV') {
-    chrome.storage.local.get(['filters'], (result) => {
-      const filters = result.filters || [];
-      const csv = filtersToCSV(filters);
-      sendResponse({ csv });
+/**
+ * Read keys from chrome.storage.local.
+ * @param {string[]} keys
+ * @returns {Promise<object>}
+ */
+function readFromStorage(keys) {
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.get(keys, (result) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+      } else {
+        resolve(result);
+      }
     });
-    return true;
-  }
+  });
+}
 
-  if (message.action === 'CLEAR_FILTERS') {
-    chrome.storage.local.remove(['filters', 'lastSource', 'lastUpdate'], () => {
-      chrome.action.setBadgeText({ text: '' });
-      sendResponse({ ok: true });
+/**
+ * Remove keys from chrome.storage.local.
+ * @param {string[]} keys
+ * @returns {Promise<void>}
+ */
+function removeFromStorage(keys) {
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.remove(keys, () => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+      } else {
+        resolve();
+      }
     });
-    return true;
-  }
-
-  return false;
-});
+  });
+}
 
 // ─── Core Logic ────────────────────────────────────────────────────
 
-function handleInterceptedFilters(source, data) {
-  let filters = [];
+/**
+ * Process intercepted filter data: parse, validate, store, update badge.
+ * @param {string} source - 'vtools' or 'souk'
+ * @param {object} data - raw API response
+ * @returns {{ ok: boolean, count: number, errors: string[] }}
+ */
+async function handleInterceptedFilters(source, data) {
+  let result;
 
   if (source === 'vtools') {
-    filters = parseVToolsFilters(data);
+    result = parseVToolsFilters(data);
   } else if (source === 'souk') {
-    filters = parseSoukFilters(data);
+    result = parseSoukFilters(data);
+  } else {
+    return { ok: false, count: 0, errors: [`Unknown source: ${source}`] };
   }
 
+  const { filters, errors } = result;
+
   if (filters.length === 0) {
-    console.warn('[Filter Exporter] No filters parsed from', source);
-    return;
+    console.warn(LOG_PREFIX, `No valid filters parsed from ${source}`, errors);
+    return { ok: false, count: 0, errors };
   }
 
   const sourceName = source === 'vtools' ? 'V-Tools' : 'Souk.to';
 
-  chrome.storage.local.set({
-    filters,
-    lastSource: sourceName,
-    lastUpdate: new Date().toISOString(),
-  });
+  try {
+    await saveToStorage({
+      filters,
+      lastSource: sourceName,
+      lastUpdate: new Date().toISOString(),
+      lastErrors: errors.length > 0 ? errors : null,
+    });
+  } catch (storageErr) {
+    const msg = `Storage save failed: ${storageErr.message}`;
+    console.error(LOG_PREFIX, msg);
+    return { ok: false, count: 0, errors: [...errors, msg] };
+  }
 
   // Update badge
-  chrome.action.setBadgeText({ text: String(filters.length) });
-  chrome.action.setBadgeBackgroundColor({ color: '#10b981' });
+  try {
+    chrome.action.setBadgeText({ text: String(filters.length) });
+    chrome.action.setBadgeBackgroundColor({ color: '#8b5cf6' });
+  } catch (badgeErr) {
+    console.warn(LOG_PREFIX, 'Badge update failed:', badgeErr);
+  }
 
-  console.log(`[Filter Exporter] Stored ${filters.length} filters from ${sourceName}`);
+  if (errors.length > 0) {
+    console.warn(LOG_PREFIX, `Stored ${filters.length} filters from ${sourceName} with ${errors.length} warnings:`, errors);
+  } else {
+    console.log(LOG_PREFIX, `Stored ${filters.length} filters from ${sourceName}`);
+  }
+
+  return { ok: true, count: filters.length, errors };
 }
+
+// ─── Message Handler ───────────────────────────────────────────────
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!message || !message.action) {
+    sendResponse({ ok: false, error: 'Invalid message: missing action' });
+    return false;
+  }
+
+  switch (message.action) {
+    case 'FILTERS_INTERCEPTED': {
+      if (!message.source || !message.data) {
+        sendResponse({ ok: false, error: 'Missing source or data' });
+        return false;
+      }
+      // Handle async with promise
+      handleInterceptedFilters(message.source, message.data)
+        .then((result) => sendResponse(result))
+        .catch((err) => sendResponse({ ok: false, error: err.message }));
+      return true; // async
+    }
+
+    case 'GET_FILTERS': {
+      readFromStorage(['filters', 'lastSource', 'lastUpdate', 'lastErrors'])
+        .then((result) => {
+          sendResponse({
+            ok: true,
+            filters: result.filters || [],
+            lastSource: result.lastSource || null,
+            lastUpdate: result.lastUpdate || null,
+            lastErrors: result.lastErrors || null,
+          });
+        })
+        .catch((err) => {
+          sendResponse({ ok: false, error: err.message, filters: [] });
+        });
+      return true;
+    }
+
+    case 'EXPORT_CSV': {
+      readFromStorage(['filters'])
+        .then((result) => {
+          const filters = result.filters || [];
+          if (filters.length === 0) {
+            sendResponse({ ok: false, error: 'No filters to export' });
+            return;
+          }
+          const csv = filtersToCSV(filters);
+          sendResponse({ ok: true, csv, count: filters.length });
+        })
+        .catch((err) => {
+          sendResponse({ ok: false, error: err.message });
+        });
+      return true;
+    }
+
+    case 'CLEAR_FILTERS': {
+      removeFromStorage(['filters', 'lastSource', 'lastUpdate', 'lastErrors'])
+        .then(() => {
+          chrome.action.setBadgeText({ text: '' });
+          sendResponse({ ok: true });
+        })
+        .catch((err) => {
+          sendResponse({ ok: false, error: err.message });
+        });
+      return true;
+    }
+
+    default:
+      sendResponse({ ok: false, error: `Unknown action: ${message.action}` });
+      return false;
+  }
+});
 
 // ─── Install handler ───────────────────────────────────────────────
 
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('[Filter Exporter] Extension installed');
+  console.log(LOG_PREFIX, 'Extension installed');
   chrome.action.setBadgeText({ text: '' });
 });
