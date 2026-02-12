@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="logo_rounded.png" alt="Kops Filter Exporter" width="120" />
+  <img src="icons/icon128.png" alt="Kops Filter Exporter" width="120" />
 </p>
 
 <h1 align="center">Kops Filter Exporter</h1>

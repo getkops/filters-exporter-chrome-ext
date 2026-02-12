@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read version from manifest
+        id: version
+        run: |
+          VERSION=$(jq -r '.version' manifest.json)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build zip
+        run: |
+          zip -r kops-filter-exporter-v${{ steps.version.outputs.version }}.zip \
+            manifest.json \
+            LICENSE \
+            icons/ \
+            src/ \
+            logo_rounded.png \
+            -x "*.git*" "example_*"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Kops Filter Exporter v${{ steps.version.outputs.version }}"
+          body: |
+            ## Installation
+            1. Download `kops-filter-exporter-v${{ steps.version.outputs.version }}.zip` below
+            2. Unzip the archive
+            3. Open `chrome://extensions` → enable **Developer mode**
+            4. Click **Load unpacked** → select the unzipped folder
+          files: kops-filter-exporter-v${{ steps.version.outputs.version }}.zip
+          generate_release_notes: true
