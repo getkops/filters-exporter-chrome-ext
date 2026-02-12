@@ -33,11 +33,24 @@ Kops Filter Exporter silently intercepts the filters/alerts API responses when y
 
 ## Installation
 
-1. Clone or download this repository
-2. Open `chrome://extensions` in Chrome
-3. Enable **Developer mode** (top-right toggle)
-4. Click **Load unpacked** and select the project folder
-5. The Kops filter icon appears in your toolbar
+### Option A — Download the latest release (recommended)
+
+1. Go to the [**Releases page**](https://github.com/getkops/filters-exporter-chrome-ext/releases/latest)
+2. Download the `kops-filter-exporter-v*.zip` file
+3. Unzip the archive
+4. Open `chrome://extensions` in Chrome → enable **Developer mode** (top-right toggle)
+5. Click **Load unpacked** → select the unzipped folder
+6. The Kops filter icon appears in your toolbar
+
+### Option B — Clone the repository
+
+```bash
+git clone https://github.com/getkops/filters-exporter-chrome-ext.git
+```
+
+1. Open `chrome://extensions` in Chrome → enable **Developer mode**
+2. Click **Load unpacked** → select the cloned `filters-exporter-chrome-ext` folder
+3. The Kops filter icon appears in your toolbar
 
 ## Usage
 
