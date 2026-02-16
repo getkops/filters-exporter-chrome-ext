@@ -11,9 +11,11 @@
 </p>
 
 <p align="center">
+  <a href="https://chromewebstore.google.com/detail/kops-filter-exporter/mbdpmogocbigcjghpdlcckplhjnbhand">
+    <img src="https://img.shields.io/chrome-web-store/v/mbdpmogocbigcjghpdlcckplhjnbhand?label=chrome%20web%20store&logo=googlechrome&logoColor=white&color=4285F4" alt="Chrome Web Store" />
+  </a>
   <img src="https://img.shields.io/badge/manifest-v3-brightgreen" alt="Manifest V3" />
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License" />
-  <img src="https://img.shields.io/badge/chrome-extension-yellow" alt="Chrome Extension" />
 </p>
 
 ---
@@ -33,16 +35,25 @@ Kops Filter Exporter silently intercepts the filters/alerts API responses when y
 
 ## Installation
 
-### Option A — Download the latest release (recommended)
+### Option A — Chrome Web Store (recommended)
+
+<p align="center">
+  <a href="https://chromewebstore.google.com/detail/kops-filter-exporter/mbdpmogocbigcjghpdlcckplhjnbhand">
+    <img src="https://storage.googleapis.com/web-dev-uploads/image/WlD8wC6g8khYWPJUsQceQkhXSlv1/iNEddTyWiMfLSwFD6qGq.png" alt="Available in the Chrome Web Store" width="248" />
+  </a>
+</p>
+
+Install directly from the [**Chrome Web Store**](https://chromewebstore.google.com/detail/kops-filter-exporter/mbdpmogocbigcjghpdlcckplhjnbhand) — one click, automatic updates.
+
+### Option B — Download the latest release
 
 1. Go to the [**Releases page**](https://github.com/getkops/filters-exporter-chrome-ext/releases/latest)
 2. Download the `kops-filter-exporter-v*.zip` file
 3. Unzip the archive
 4. Open `chrome://extensions` in Chrome → enable **Developer mode** (top-right toggle)
 5. Click **Load unpacked** → select the unzipped folder
-6. The Kops filter icon appears in your toolbar
 
-### Option B — Clone the repository
+### Option C — Clone the repository
 
 ```bash
 git clone https://github.com/getkops/filters-exporter-chrome-ext.git
@@ -50,7 +61,6 @@ git clone https://github.com/getkops/filters-exporter-chrome-ext.git
 
 1. Open `chrome://extensions` in Chrome → enable **Developer mode**
 2. Click **Load unpacked** → select the cloned `filters-exporter-chrome-ext` folder
-3. The Kops filter icon appears in your toolbar
 
 ## Usage
 
