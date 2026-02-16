@@ -12,6 +12,7 @@ const CSV_COLUMNS = [
   'colors', 'color_ids',
   'materials', 'material_ids',
   'countries', 'country_ids',
+  'video_game_platforms', 'video_game_platform_ids',
   'enabled',
 ];
 

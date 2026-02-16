@@ -67,6 +67,9 @@ export function parseVToolsFilters(response) {
       material_ids: joinIds(safeArray(filter.materials)),
       countries: joinField(safeArray(filter.countries), 'data'),
       country_ids: joinIds(safeArray(filter.countries)),
+      video_game_platforms: joinField(safeArray(filter.platforms), 'data'),
+      video_game_platform_ids: joinIds(safeArray(filter.platforms)),
+      autocop: filter.website_metadata?.boosted === true ? 'yes' : 'no',
       enabled: filter.enabled === true ? 'yes' : 'no',
     }));
 }

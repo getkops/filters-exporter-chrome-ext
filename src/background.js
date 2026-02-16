@@ -80,6 +80,8 @@ function normalizeVToolsFilter(filter) {
     material_ids: joinIds(safeArray(filter.materials)),
     countries: joinField(safeArray(filter.countries), 'data'),
     country_ids: joinIds(safeArray(filter.countries)),
+    video_game_platforms: joinField(safeArray(filter.platforms), 'data'),
+    video_game_platform_ids: joinIds(safeArray(filter.platforms)),
     enabled: filter.enabled === true ? 'yes' : 'no',
   };
 }
@@ -150,6 +152,8 @@ function normalizeSoukFilter(alert) {
     material_ids: '',
     countries: '',
     country_ids: '',
+    video_game_platforms: joinField(safeArray(alert.video_game_platforms), 'title'),
+    video_game_platform_ids: joinIds(safeArray(alert.video_game_platforms)),
     enabled: alert.is_deactivated === true ? 'no' : 'yes',
   };
 }
@@ -201,6 +205,7 @@ const CSV_COLUMNS = [
   'colors', 'color_ids',
   'materials', 'material_ids',
   'countries', 'country_ids',
+  'video_game_platforms', 'video_game_platform_ids',
   'enabled',
 ];
 

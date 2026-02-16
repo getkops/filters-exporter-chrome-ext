@@ -1,6 +1,7 @@
 /**
  * popup.js — Popup UI logic for the Kops Filter Exporter extension.
- * Handles filter display, CSV export, and live updates with comprehensive error handling.
+ * Handles filter display, search, row selection, CSV export,
+ * and live updates with comprehensive error handling.
  */
 
 (function () {
@@ -22,10 +23,19 @@
   const exportBtn = $('exportBtn');
   const clearBtn = $('clearBtn');
   const lastUpdateEl = $('lastUpdate');
+  const searchBar = $('searchBar');
+  const searchInput = $('searchInput');
+  const selectionToolbar = $('selectionToolbar');
+  const selectAllCheckbox = $('selectAllCheckbox');
+  const selectionText = $('selectionText');
+  const headerCheckbox = $('headerCheckbox');
 
   // ─── State ────────────────────────────────────────────────────
 
   let isExporting = false;
+  let allFilters = [];       // full list from storage
+  let visibleIndices = [];   // indices into allFilters that match search
+  let selectedIndices = new Set(); // indices into allFilters that are selected
 
   // ─── CSV Generation ───────────────────────────────────────────
 
@@ -38,6 +48,7 @@
     'colors', 'color_ids',
     'materials', 'material_ids',
     'countries', 'country_ids',
+    'video_game_platforms', 'video_game_platform_ids',
     'enabled',
   ];
 
@@ -111,6 +122,8 @@
     loadingState.style.display = 'flex';
     emptyState.style.display = 'none';
     filterTable.style.display = 'none';
+    searchBar.style.display = 'none';
+    selectionToolbar.style.display = 'none';
     hideError();
   }
 
@@ -118,6 +131,8 @@
     loadingState.style.display = 'none';
     emptyState.style.display = 'flex';
     filterTable.style.display = 'none';
+    searchBar.style.display = 'none';
+    selectionToolbar.style.display = 'none';
     statusBar.classList.remove('active');
     statusText.textContent = 'Waiting for data…';
     statusBadge.textContent = '0';
@@ -136,33 +151,168 @@
     errorText.textContent = '';
   }
 
-  // ─── Render Filters ──────────────────────────────────────────
+  // ─── Search ──────────────────────────────────────────────────
 
-  function renderFilters(filters, source, updated, errors) {
-    // Hide loading, show table
-    loadingState.style.display = 'none';
-    emptyState.style.display = 'none';
-    filterTable.style.display = 'table';
+  function getSearchQuery() {
+    return (searchInput.value || '').trim().toLowerCase();
+  }
 
-    // Status bar
-    statusBar.classList.add('active');
-    const count = filters.length;
-    statusText.textContent = `${source} — ${count} filter${count !== 1 ? 's' : ''} captured`;
-    statusBadge.textContent = String(count);
+  function filterMatchesSearch(filter, query) {
+    if (!query) return true;
+    const searchable = [
+      filter.name,
+      filter.search_text,
+      filter.brands,
+      filter.catalogs,
+      filter.video_game_platforms,
+    ].filter(Boolean).join(' ').toLowerCase();
+    return searchable.includes(query);
+  }
 
-    // Show warning if there were parse errors
-    if (errors && errors.length > 0) {
-      showError(`${errors.length} warning${errors.length !== 1 ? 's' : ''} during parsing`);
+  function computeVisibleIndices() {
+    const query = getSearchQuery();
+    visibleIndices = [];
+    allFilters.forEach((filter, i) => {
+      if (filterMatchesSearch(filter, query)) {
+        visibleIndices.push(i);
+      }
+    });
+  }
+
+  // ─── Selection ───────────────────────────────────────────────
+
+  function updateSelectionUI() {
+    const count = selectedIndices.size;
+    const visibleCount = visibleIndices.length;
+    const visibleSelected = visibleIndices.filter((i) => selectedIndices.has(i)).length;
+
+    // Selection toolbar
+    if (allFilters.length > 0) {
+      selectionToolbar.style.display = 'flex';
+      selectionText.textContent = count === 0
+        ? `${visibleCount} filter${visibleCount !== 1 ? 's' : ''} shown`
+        : `${count} of ${allFilters.length} selected`;
     } else {
-      hideError();
+      selectionToolbar.style.display = 'none';
     }
 
-    // Build table rows
+    // Select all checkbox state
+    selectAllCheckbox.checked = visibleCount > 0 && visibleSelected === visibleCount;
+    selectAllCheckbox.classList.toggle(
+      'indeterminate',
+      visibleSelected > 0 && visibleSelected < visibleCount
+    );
+
+    // Header checkbox state
+    headerCheckbox.checked = visibleCount > 0 && visibleSelected === visibleCount;
+    headerCheckbox.classList.toggle(
+      'indeterminate',
+      visibleSelected > 0 && visibleSelected < visibleCount
+    );
+
+    // Row styling
+    const hasSelection = count > 0;
+    const rows = filterTableBody.querySelectorAll('tr');
+    rows.forEach((row) => {
+      const idx = parseInt(row.dataset.filterIndex, 10);
+      const cb = row.querySelector('input[type="checkbox"]');
+      if (cb) cb.checked = selectedIndices.has(idx);
+      row.classList.toggle('unselected', hasSelection && !selectedIndices.has(idx));
+    });
+
+    // Export button label
+    if (count > 0) {
+      exportBtn.textContent = '';
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('width', '15');
+      svg.setAttribute('height', '15');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('fill', 'none');
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', 'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3');
+      path.setAttribute('stroke', 'currentColor');
+      path.setAttribute('stroke-width', '2');
+      path.setAttribute('stroke-linecap', 'round');
+      path.setAttribute('stroke-linejoin', 'round');
+      svg.appendChild(path);
+      exportBtn.appendChild(svg);
+      exportBtn.appendChild(document.createTextNode(` Export ${count} selected`));
+    } else {
+      exportBtn.textContent = '';
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('width', '15');
+      svg.setAttribute('height', '15');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('fill', 'none');
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', 'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3');
+      path.setAttribute('stroke', 'currentColor');
+      path.setAttribute('stroke-width', '2');
+      path.setAttribute('stroke-linecap', 'round');
+      path.setAttribute('stroke-linejoin', 'round');
+      svg.appendChild(path);
+      exportBtn.appendChild(svg);
+      exportBtn.appendChild(document.createTextNode(' Export CSV'));
+    }
+  }
+
+  function toggleSelectAll() {
+    const visibleSelected = visibleIndices.filter((i) => selectedIndices.has(i)).length;
+    const allVisible = visibleSelected === visibleIndices.length;
+
+    if (allVisible) {
+      // Deselect all visible
+      visibleIndices.forEach((i) => selectedIndices.delete(i));
+    } else {
+      // Select all visible
+      visibleIndices.forEach((i) => selectedIndices.add(i));
+    }
+    updateSelectionUI();
+  }
+
+  function toggleRow(index) {
+    if (selectedIndices.has(index)) {
+      selectedIndices.delete(index);
+    } else {
+      selectedIndices.add(index);
+    }
+    updateSelectionUI();
+  }
+
+  // ─── Render Filters ──────────────────────────────────────────
+
+  function renderTable() {
     filterTableBody.innerHTML = '';
 
-    const fragment = document.createDocumentFragment();
-    filters.forEach((filter) => {
+    if (visibleIndices.length === 0 && getSearchQuery()) {
+      // Show no results message
       const tr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = 5;
+      td.className = 'no-results';
+      td.textContent = 'No filters match your search';
+      tr.appendChild(td);
+      filterTableBody.appendChild(tr);
+      return;
+    }
+
+    const hasSelection = selectedIndices.size > 0;
+    const fragment = document.createDocumentFragment();
+
+    visibleIndices.forEach((filterIndex) => {
+      const filter = allFilters[filterIndex];
+      const tr = document.createElement('tr');
+      tr.dataset.filterIndex = filterIndex;
+
+      // Checkbox cell
+      const tdCheck = document.createElement('td');
+      tdCheck.className = 'td-checkbox';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = selectedIndices.has(filterIndex);
+      cb.addEventListener('change', () => toggleRow(filterIndex));
+      tdCheck.appendChild(cb);
+      tr.appendChild(tdCheck);
 
       // Name cell
       const tdName = document.createElement('td');
@@ -201,10 +351,44 @@
       tdStatus.appendChild(badge);
       tr.appendChild(tdStatus);
 
+      // Dim unselected rows
+      if (hasSelection && !selectedIndices.has(filterIndex)) {
+        tr.classList.add('unselected');
+      }
+
       fragment.appendChild(tr);
     });
 
     filterTableBody.appendChild(fragment);
+  }
+
+  function renderFilters(filters, source, updated, errors) {
+    allFilters = filters;
+    selectedIndices = new Set();
+
+    // Hide loading, show table + search
+    loadingState.style.display = 'none';
+    emptyState.style.display = 'none';
+    filterTable.style.display = 'table';
+    searchBar.style.display = 'flex';
+
+    // Status bar
+    statusBar.classList.add('active');
+    const count = filters.length;
+    statusText.textContent = `${source} — ${count} filter${count !== 1 ? 's' : ''} captured`;
+    statusBadge.textContent = String(count);
+
+    // Show warning if there were parse errors
+    if (errors && errors.length > 0) {
+      showError(`${errors.length} warning${errors.length !== 1 ? 's' : ''} during parsing`);
+    } else {
+      hideError();
+    }
+
+    // Compute visible and render
+    computeVisibleIndices();
+    renderTable();
+    updateSelectionUI();
 
     // Enable buttons
     exportBtn.disabled = false;
@@ -275,6 +459,18 @@
 
   // ─── Event Listeners ─────────────────────────────────────────
 
+  // Search input
+  searchInput.addEventListener('input', () => {
+    computeVisibleIndices();
+    renderTable();
+    updateSelectionUI();
+  });
+
+  // Select all checkboxes (both toolbar and header)
+  selectAllCheckbox.addEventListener('change', toggleSelectAll);
+  headerCheckbox.addEventListener('change', toggleSelectAll);
+
+  // Export
   exportBtn.addEventListener('click', async () => {
     if (isExporting) return;
     isExporting = true;
@@ -288,7 +484,20 @@
         return;
       }
 
-      const csv = filtersToCSV(response.filters);
+      // Determine which filters to export
+      let filtersToExport;
+      if (selectedIndices.size > 0) {
+        filtersToExport = response.filters.filter((_, i) => selectedIndices.has(i));
+      } else {
+        filtersToExport = response.filters;
+      }
+
+      if (filtersToExport.length === 0) {
+        showToast('No filters selected for export');
+        return;
+      }
+
+      const csv = filtersToCSV(filtersToExport);
       if (!csv) {
         showToast('Failed to generate CSV');
         return;
@@ -301,7 +510,7 @@
       const filename = `${source}_filters_${timestamp}.csv`;
 
       downloadCSV(csv, filename);
-      showToast(`Exported ${response.filters.length} filters`, 'success');
+      showToast(`Exported ${filtersToExport.length} filters`, 'success');
     } catch (err) {
       console.error('[Kops Filter Exporter] Export failed:', err);
       showToast('Export failed — try again', 'error');
@@ -316,6 +525,10 @@
 
     try {
       await sendMessage({ action: 'CLEAR_FILTERS' });
+      allFilters = [];
+      visibleIndices = [];
+      selectedIndices = new Set();
+      searchInput.value = '';
       showEmpty();
       hideError();
       showToast('Filters cleared');

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Kops Filter Exporter",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Extract and export filters from V-Tools and Souk.to as universal CSV — by Kops, the fastest Vinted monitor",
   "homepage_url": "https://getkops.com",
   "author": "Kops",
@@ -31,7 +31,9 @@
         "*://app.v-tools.com/*",
         "*://*.v-tools.com/*"
       ],
-      "js": ["src/content.js"],
+      "js": [
+        "src/content.js"
+      ],
       "run_at": "document_start"
     },
     {
@@ -39,13 +41,17 @@
         "*://souk.to/*",
         "*://*.souk.to/*"
       ],
-      "js": ["src/content.js"],
+      "js": [
+        "src/content.js"
+      ],
       "run_at": "document_start"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["src/inject.js"],
+      "resources": [
+        "src/inject.js"
+      ],
       "matches": [
         "*://app.v-tools.com/*",
         "*://*.v-tools.com/*",

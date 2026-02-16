@@ -69,6 +69,8 @@ export function parseSoukFilters(response) {
       material_ids: '',
       countries: '',
       country_ids: '',
+      video_game_platforms: joinField(safeArray(alert.video_game_platforms), 'title'),
+      video_game_platform_ids: joinIds(safeArray(alert.video_game_platforms)),
       enabled: alert.is_deactivated === true ? 'no' : 'yes',
     }));
 }

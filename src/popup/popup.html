@@ -38,6 +38,23 @@
       <span id="errorText"></span>
     </div>
 
+    <!-- Search Bar -->
+    <div class="search-bar" id="searchBar" style="display: none;">
+      <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/>
+        <path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <input type="text" id="searchInput" placeholder="Search filters…" autocomplete="off" spellcheck="false">
+    </div>
+
+    <!-- Selection Toolbar -->
+    <div class="selection-toolbar" id="selectionToolbar" style="display: none;">
+      <label class="select-all-label">
+        <input type="checkbox" id="selectAllCheckbox">
+        <span id="selectionText">0 selected</span>
+      </label>
+    </div>
+
     <!-- Content Area -->
     <div class="table-wrapper" id="tableWrapper">
       <!-- Loading State -->
@@ -68,6 +85,7 @@
       <table class="filter-table" id="filterTable" style="display: none;">
         <thead>
           <tr>
+            <th class="th-checkbox"><input type="checkbox" id="headerCheckbox" title="Select all"></th>
             <th>Name</th>
             <th>Brands</th>
             <th>Price</th>
