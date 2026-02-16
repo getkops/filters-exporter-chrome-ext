@@ -39,7 +39,7 @@ Kops Filter Exporter silently intercepts the filters/alerts API responses when y
 
 <p align="center">
   <a href="https://chromewebstore.google.com/detail/kops-filter-exporter/mbdpmogocbigcjghpdlcckplhjnbhand">
-    <img src="https://storage.googleapis.com/web-dev-uploads/image/WlD8wC6g8khYWPJUsQceQkhXSlv1/iNEddTyWiMfLSwFD6qGq.png" alt="Available in the Chrome Web Store" width="248" />
+    <img src="https://img.shields.io/badge/install-Chrome%20Web%20Store-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Available in the Chrome Web Store" />
   </a>
 </p>
 
