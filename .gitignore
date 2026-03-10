@@ -1,3 +1,4 @@
 example_*.json
+example_*.csv
 store/*
 dist/
