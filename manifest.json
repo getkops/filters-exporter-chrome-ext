@@ -29,6 +29,19 @@
     {
       "matches": [
         "*://app.v-tools.com/*",
+        "*://*.v-tools.com/*",
+        "*://souk.to/*",
+        "*://*.souk.to/*"
+      ],
+      "js": [
+        "src/inject.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "*://app.v-tools.com/*",
         "*://*.v-tools.com/*"
       ],
       "js": [
@@ -47,17 +60,4 @@
       "run_at": "document_start"
     }
   ],
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "src/inject.js"
-      ],
-      "matches": [
-        "*://app.v-tools.com/*",
-        "*://*.v-tools.com/*",
-        "*://souk.to/*",
-        "*://*.souk.to/*"
-      ]
-    }
-  ]
 }

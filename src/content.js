@@ -1,7 +1,11 @@
 /**
  * content.js — Content script injected into V-Tools and Souk.to pages.
- * Injects inject.js into the page context and bridges messages
- * from the page to the service worker.
+ * Bridges intercepted data from inject.js (running in MAIN world)
+ * to the service worker.
+ *
+ * Note: inject.js is declared separately in manifest.json with world: "MAIN"
+ * so it runs synchronously in the page context at document_start,
+ * eliminating any race condition with page scripts.
  */
 
 (function () {
@@ -9,39 +13,6 @@
 
   const LOG_PREFIX = '[Kops Filter Exporter]';
   const MSG_TYPE = '__FILTER_EXPORTER_INTERCEPTED__';
-
-  /**
-   * Inject the page-context script into the DOM.
-   * Uses the extension's web_accessible_resources URL.
-   */
-  function injectPageScript() {
-    try {
-      const url = chrome.runtime.getURL('src/inject.js');
-      if (!url) {
-        console.error(LOG_PREFIX, 'Failed to resolve inject.js URL');
-        return;
-      }
-
-      const script = document.createElement('script');
-      script.src = url;
-      script.onload = function () {
-        this.remove();
-      };
-      script.onerror = function () {
-        console.error(LOG_PREFIX, 'Failed to load inject.js');
-        this.remove();
-      };
-
-      const target = document.head || document.documentElement;
-      if (target) {
-        target.appendChild(script);
-      } else {
-        console.error(LOG_PREFIX, 'No DOM target available for script injection');
-      }
-    } catch (err) {
-      console.error(LOG_PREFIX, 'Script injection failed:', err);
-    }
-  }
 
   /**
    * Forward intercepted data from the page context to the service worker.
@@ -89,6 +60,5 @@
 
   // ─── Init ─────────────────────────────────────────────────────
 
-  injectPageScript();
   window.addEventListener('message', handlePageMessage);
 })();
