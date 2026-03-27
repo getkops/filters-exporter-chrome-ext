@@ -19,6 +19,12 @@
    * Validates the message structure before forwarding.
    */
   function handlePageMessage(event) {
+    // Extension context invalidated (e.g. extension reloaded) — detach cleanly
+    if (!chrome.runtime?.id) {
+      window.removeEventListener('message', handlePageMessage);
+      return;
+    }
+
     // Only accept messages from the same window
     if (event.source !== window) return;
 
