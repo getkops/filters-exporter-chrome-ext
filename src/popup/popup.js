@@ -29,6 +29,9 @@
   const selectAllCheckbox = $('selectAllCheckbox');
   const selectionText = $('selectionText');
   const headerCheckbox = $('headerCheckbox');
+  const refreshDropdown = $('refreshDropdown');
+  const refreshBtn = $('refreshBtn');
+  const refreshMenu = $('refreshMenu');
 
   // ─── State ────────────────────────────────────────────────────
 
@@ -36,6 +39,11 @@
   let allFilters = [];       // full list from storage
   let visibleIndices = [];   // indices into allFilters that match search
   let selectedIndices = new Set(); // indices into allFilters that are selected
+
+  const REFRESH_TARGETS = {
+    vtools: 'https://app.v-tools.com/dashboard/filtres',
+    souk: 'https://souk.to/app/alerts',
+  };
 
   // ─── CSV Generation ───────────────────────────────────────────
 
@@ -536,6 +544,43 @@
       console.error('[Kops Filter Exporter] Clear failed:', err);
       showToast('Clear failed — try again', 'error');
       clearBtn.disabled = false;
+    }
+  });
+
+  // ─── Refresh Dropdown ───────────────────────────────────────────
+
+  refreshBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    refreshDropdown.classList.toggle('open');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!refreshDropdown.contains(e.target)) {
+      refreshDropdown.classList.remove('open');
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      refreshDropdown.classList.remove('open');
+    }
+  });
+
+  refreshMenu.addEventListener('click', async (e) => {
+    const item = e.target.closest('.dropdown-item');
+    if (!item) return;
+
+    const source = item.dataset.source;
+    const url = REFRESH_TARGETS[source];
+    if (!url) return;
+
+    refreshDropdown.classList.remove('open');
+
+    try {
+      await chrome.tabs.create({ url, active: true });
+    } catch (err) {
+      console.error('[Kops Filter Exporter] Refresh failed:', err);
+      showToast('Could not open page', 'error');
     }
   });
 

@@ -72,12 +72,12 @@
         </div>
         <p class="empty-title">No filters captured yet</p>
         <p class="empty-desc">
-          Visit <strong>V-Tools</strong> or <strong>Souk.to</strong> filters page.<br>
-          Filters will be captured automatically.
+          Visit <strong>V-Tools</strong> or <strong>Souk.to</strong> filters page,<br>
+          or click <strong>Refresh</strong> below to open one.
         </p>
         <div class="url-hints">
           <code>app.v-tools.com/dashboard/filtres</code>
-          <code>souk.to/en/app/alerts</code>
+          <code>souk.to/app/alerts</code>
         </div>
       </div>
 
@@ -104,6 +104,22 @@
         </svg>
         Export CSV
       </button>
+      <div class="dropdown" id="refreshDropdown">
+        <button class="btn btn-ghost" id="refreshBtn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M1 4v6h6M23 20v-6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Refresh
+          <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <div class="dropdown-menu" id="refreshMenu">
+          <button type="button" class="dropdown-item" data-source="vtools">V-Tools</button>
+          <button type="button" class="dropdown-item" data-source="souk">Souk.to</button>
+        </div>
+      </div>
       <button class="btn btn-ghost" id="clearBtn" disabled>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>

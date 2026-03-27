@@ -425,6 +425,71 @@ body {
   border-color: var(--border-hover);
 }
 
+/* ─── Dropdown ────────────────────────────────────────────────── */
+
+.dropdown {
+  position: relative;
+  flex: 1;
+}
+
+.dropdown .btn {
+  width: 100%;
+}
+
+.dropdown .chevron {
+  margin-left: auto;
+  opacity: 0.5;
+  transition: transform var(--transition-fast);
+}
+
+.dropdown.open .chevron {
+  transform: rotate(180deg);
+}
+
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.dropdown.open .dropdown-menu {
+  display: block;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font-family: var(--font);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: left;
+}
+
+.dropdown-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.dropdown-item:active {
+  background: var(--bg-active);
+}
+
 /* ─── Footer ───────────────────────────────────────────────────── */
 
 .footer {
