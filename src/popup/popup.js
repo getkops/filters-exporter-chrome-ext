@@ -41,7 +41,8 @@
   let selectedIndices = new Set(); // indices into allFilters that are selected
 
   const REFRESH_TARGETS = {
-    vtools: 'https://app.v-tools.com/dashboard/filtres',
+    vtoolsv1: 'https://app.v-tools.com/dashboard/filtres',
+    vtoolsv2: 'https://dashboard.v-tools.com/',
     souk: 'https://souk.to/app/alerts',
   };
 
@@ -57,7 +58,11 @@
     'materials', 'material_ids',
     'countries', 'country_ids',
     'video_game_platforms', 'video_game_platform_ids',
-    'enabled',
+    'video_game_ratings', 'video_game_rating_ids',
+    'keywords_include', 'keywords_include_strict',
+    'keywords_exclude', 'keywords_exclude_strict',
+    'regions',
+    'autocop', 'enabled',
   ];
 
   function escapeCsvValue(value) {

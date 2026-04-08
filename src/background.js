@@ -61,7 +61,7 @@ function normalizeVToolsFilter(filter) {
   if (name == null || String(name).trim() === '') return null;
 
   return {
-    source: 'V-Tools',
+    source: 'V-Tools V1',
     name: String(name),
     search_text: String(filter.search_text ?? ''),
     price_from: filter.price_from ?? '',
@@ -82,6 +82,13 @@ function normalizeVToolsFilter(filter) {
     country_ids: joinIds(safeArray(filter.countries)),
     video_game_platforms: joinField(safeArray(filter.platforms), 'data'),
     video_game_platform_ids: joinIds(safeArray(filter.platforms)),
+    video_game_ratings: '',
+    video_game_rating_ids: '',
+    keywords_include: '',
+    keywords_include_strict: '',
+    keywords_exclude: '',
+    keywords_exclude_strict: '',
+    regions: '',
     autocop: filter.website_metadata?.boosted === true ? 'yes' : 'no',
     enabled: filter.enabled === true ? 'yes' : 'no',
   };
@@ -155,6 +162,13 @@ function normalizeSoukFilter(alert) {
     country_ids: '',
     video_game_platforms: joinField(safeArray(alert.video_game_platforms), 'title'),
     video_game_platform_ids: joinIds(safeArray(alert.video_game_platforms)),
+    video_game_ratings: '',
+    video_game_rating_ids: '',
+    keywords_include: '',
+    keywords_include_strict: '',
+    keywords_exclude: '',
+    keywords_exclude_strict: '',
+    regions: '',
     autocop: '',
     enabled: alert.is_deactivated === true ? 'no' : 'yes',
   };
@@ -196,6 +210,161 @@ function parseSoukFilters(response) {
   return { filters, errors };
 }
 
+/**
+ * V-Tools V2 region ID → ISO code lookup.
+ * Titles from the API are i18n tokens ($(i18n){region_fr_title}) — unusable.
+ * Falls back to the raw region_id for any unknown/future region.
+ */
+const VTOOLSV2_REGIONS = {
+  'reg_2KgHAL52ejLKnRcx5bABk': 'AT',
+  'reg_5iGDVjVMgtP1qCATKPMgE': 'SE',
+  'reg_7k2XtAN7ITVXwMau3L4OV': 'LU',
+  'reg_CUjUNaAra57G7kxCETXQi': 'ES',
+  'reg_IezcaEzJsV7i80r1tt4EK': 'FR',
+  'reg_NrN16I4lnsMYYq9lgTuX0': 'SI',
+  'reg_O4xzVWJ2hKAYZ8EbhBemm': 'DK',
+  'reg_PYMWsFJcmafUijOHP7u3T': 'PL',
+  'reg_SxvmyclwnGwJU22Yi0L4l': 'DE',
+  'reg_VkmQJGec1MxkLR1qnsVFp': 'NL',
+  'reg_YrXXUOW4Vwt8o3QySUamB': 'IT',
+  'reg_ZuyCwDKdcAZLWuDlX2AZ9': 'HR',
+  'reg_bamDITFPiTc0db2mp0I3O': 'FI',
+  'reg_hLdpqsKilRnoTyAD7kgGd': 'LT',
+  'reg_hbsUPfIMrl3aAdg5rcT78': 'IE',
+  'reg_j9aILAwgWKpOljtCRE5QO': 'CZ',
+  'reg_kNBKTCh4isES5pHEziYCu': 'BE',
+  'reg_klRNv4mJo4yIpzBVU8dHH': 'GB',
+  'reg_mijK7mEf0YR5zRPLgckFz': 'GR',
+  'reg_oA7keE3ctUtgQgwFbmaqu': 'PT',
+};
+
+/**
+ * Validate and normalize a single V-Tools V2 filter object.
+ * V2 uses a polymorphic `components[]` array with typed entries.
+ * Keyword has 4 operators: contains, strict_contains, ncontains, strict_ncontains.
+ * Country uses {title, value} objects; region uses plain string IDs.
+ * @param {object} filter
+ * @returns {object|null}
+ */
+function normalizeVToolsV2Filter(filter) {
+  if (!filter || typeof filter !== 'object') return null;
+
+  const name = filter.name;
+  if (name == null || String(name).trim() === '') return null;
+
+  const components = safeArray(filter.components);
+
+  // Build a lookup by component type (first occurrence wins for non-keyword types)
+  const comp = {};
+  for (const c of components) {
+    if (c?.type && c.type !== 'keyword' && !comp[c.type]) comp[c.type] = c;
+  }
+
+  // Collect keyword components grouped by operator (multiple allowed)
+  const kwByOp = {};
+  for (const c of components) {
+    if (c?.type === 'keyword' && c.operator) {
+      if (!kwByOp[c.operator]) kwByOp[c.operator] = [];
+      kwByOp[c.operator].push(...safeArray(c.value));
+    }
+  }
+
+  // search_text = all include keywords combined (backward compat column)
+  const allInclude = [
+    ...(kwByOp['contains'] || []),
+    ...(kwByOp['strict_contains'] || []),
+  ];
+
+  // Price
+  const priceFrom = comp.price?.value?.min ?? '';
+  const priceTo = comp.price?.value?.max ?? '';
+
+  // Array-of-{title, value} components — V2 uses 'title' for label, 'value' for ID
+  const catalogItems = safeArray(comp.catalog?.value);
+  const brandItems = safeArray(comp.brand?.value);
+  const sizeItems = safeArray(comp.size?.value);
+  const colorItems = safeArray(comp.color?.value);
+  const statusItems = safeArray(comp.status?.value);
+  const materialItems = safeArray(comp.material?.value);
+  const platformItems = safeArray(comp.video_game_platform?.value);
+  const ratingItems = safeArray(comp.video_game_rating?.value);
+  const countryItems = safeArray(comp.country?.value);
+
+  // Regions: plain string IDs resolved via lookup (fallback to raw ID for unknowns)
+  const regionItems = safeArray(comp.region?.value).map(
+    (id) => VTOOLSV2_REGIONS[id] || id
+  );
+
+  return {
+    source: 'V-Tools V2',
+    name: String(name),
+    search_text: allInclude.join(' | '),
+    price_from: priceFrom,
+    price_to: priceTo,
+    catalogs: joinField(catalogItems, 'title'),
+    catalog_ids: joinField(catalogItems, 'value'),
+    brands: joinField(brandItems, 'title'),
+    brand_ids: joinField(brandItems, 'value'),
+    sizes: joinField(sizeItems, 'title'),
+    size_ids: joinField(sizeItems, 'value'),
+    statuses: joinField(statusItems, 'title'),
+    status_ids: joinField(statusItems, 'value'),
+    colors: joinField(colorItems, 'title'),
+    color_ids: joinField(colorItems, 'value'),
+    materials: joinField(materialItems, 'title'),
+    material_ids: joinField(materialItems, 'value'),
+    countries: joinField(countryItems, 'title'),
+    country_ids: joinField(countryItems, 'value'),
+    video_game_platforms: joinField(platformItems, 'title'),
+    video_game_platform_ids: joinField(platformItems, 'value'),
+    video_game_ratings: joinField(ratingItems, 'title'),
+    video_game_rating_ids: joinField(ratingItems, 'value'),
+    keywords_include: (kwByOp['contains'] || []).join(' | '),
+    keywords_include_strict: (kwByOp['strict_contains'] || []).join(' | '),
+    keywords_exclude: (kwByOp['ncontains'] || []).join(' | '),
+    keywords_exclude_strict: (kwByOp['strict_ncontains'] || []).join(' | '),
+    regions: regionItems.join(' | '),
+    autocop: filter.boosted === true ? 'yes' : 'no',
+    enabled: filter.enabled === true ? 'yes' : 'no',
+  };
+}
+
+/**
+ * Parse the full V-Tools V2 API response.
+ * @param {object} response
+ * @returns {{ filters: Array, errors: string[] }}
+ */
+function parseVToolsV2Filters(response) {
+  const errors = [];
+
+  if (!response || typeof response !== 'object') {
+    errors.push('V-Tools V2 response is not an object');
+    return { filters: [], errors };
+  }
+
+  if (response.success !== true) {
+    errors.push(`V-Tools V2 API returned success: ${response.success ?? 'undefined'}`);
+  }
+
+  const list = response?.data?.list;
+  if (!Array.isArray(list)) {
+    errors.push('V-Tools V2 response.data.list is not an array');
+    return { filters: [], errors };
+  }
+
+  const filters = [];
+  list.forEach((raw, index) => {
+    const normalized = normalizeVToolsV2Filter(raw);
+    if (normalized) {
+      filters.push(normalized);
+    } else {
+      errors.push(`V-Tools V2 filter at index ${index} skipped (invalid or unnamed)`);
+    }
+  });
+
+  return { filters, errors };
+}
+
 // ─── CSV Generation ────────────────────────────────────────────────
 
 const CSV_COLUMNS = [
@@ -208,6 +377,10 @@ const CSV_COLUMNS = [
   'materials', 'material_ids',
   'countries', 'country_ids',
   'video_game_platforms', 'video_game_platform_ids',
+  'video_game_ratings', 'video_game_rating_ids',
+  'keywords_include', 'keywords_include_strict',
+  'keywords_exclude', 'keywords_exclude_strict',
+  'regions',
   'autocop', 'enabled',
 ];
 
@@ -318,8 +491,10 @@ function removeFromStorage(keys) {
 async function handleInterceptedFilters(source, data) {
   let result;
 
-  if (source === 'vtools') {
+  if (source === 'vtoolsv1') {
     result = parseVToolsFilters(data);
+  } else if (source === 'vtoolsv2') {
+    result = parseVToolsV2Filters(data);
   } else if (source === 'souk') {
     result = parseSoukFilters(data);
   } else {
@@ -333,7 +508,8 @@ async function handleInterceptedFilters(source, data) {
     return { ok: false, count: 0, errors };
   }
 
-  const sourceName = source === 'vtools' ? 'V-Tools' : 'Souk.to';
+  const SOURCE_NAMES = { vtoolsv1: 'V-Tools V1', vtoolsv2: 'V-Tools V2', souk: 'Souk.to' };
+  const sourceName = SOURCE_NAMES[source] || source;
 
   try {
     await saveToStorage({

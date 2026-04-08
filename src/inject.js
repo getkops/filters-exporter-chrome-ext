@@ -16,8 +16,11 @@
   const MSG_TYPE = '__FILTER_EXPORTER_INTERCEPTED__';
   const SOUK_ENDPOINT = 'api.souk.to/api/v1/matching_alert/web';
 
+  const VTOOLSV2_ENDPOINT = 'www.v-tools.com/api/vinted/filters/list';
+
   const INTERCEPT_PATTERNS = [
-    { source: 'vtools', pattern: 'custom.v-tools.com/v3/services/filters' },
+    { source: 'vtoolsv1', pattern: 'custom.v-tools.com/v3/services/filters' },
+    { source: 'vtoolsv2', pattern: VTOOLSV2_ENDPOINT },
     { source: 'souk', pattern: SOUK_ENDPOINT },
   ];
 
@@ -232,6 +235,131 @@
     }
   }
 
+  // ─── V-Tools V2 Pagination Engine ──────────────────────────────────
+
+  /**
+   * Guard: tracks active V2 pagination runs.
+   * A single key is sufficient since V2 has no search/filter params in the list URL.
+   */
+  const activeVToolsV2Runs = new Set();
+
+  /**
+   * Extract the limit parameter from the V2 URL, defaulting to 20.
+   */
+  function getVToolsV2Limit(url) {
+    const match = url.match(/[?&]limit=(\d+)/);
+    return match ? parseInt(match[1], 10) : 20;
+  }
+
+  /**
+   * Build a V2 page URL using cursor-based pagination.
+   * Uses manual string construction to avoid URLSearchParams encoding
+   * the brackets in `created_at[lt]` into `created_at%5Blt%5D`.
+   */
+  function buildVToolsV2PageUrl(originalUrl, cursor, limit) {
+    const base = originalUrl.split('?')[0];
+    return `${base}?limit=${limit}&created_at[lt]=${cursor}&order=created_at`;
+  }
+
+  /**
+   * Fetch a single V2 page using the replayed auth config.
+   * Returns { list: [] } or null on failure.
+   */
+  async function fetchVToolsV2Page(originalUrl, cursor, limit, replayConfig) {
+    const pageUrl = buildVToolsV2PageUrl(originalUrl, cursor, limit);
+    try {
+      const response = await originalFetch(pageUrl, replayConfig);
+      if (!response.ok) {
+        console.warn(LOG_PREFIX, `V-Tools V2 cursor=${cursor}: HTTP ${response.status}`);
+        return null;
+      }
+      const json = await response.json();
+      if (json?.success !== true || !Array.isArray(json?.data?.list)) return null;
+      return { list: json.data.list };
+    } catch (err) {
+      console.warn(LOG_PREFIX, `V-Tools V2 page fetch failed:`, err.message || err);
+      return null;
+    }
+  }
+
+  /**
+   * Main V2 pagination orchestrator.
+   * Strategy: cursor-based using `created_at` of the last item.
+   * Stop when: list is empty or list.length < limit.
+   * Returns null if a duplicate run is detected (caller must NOT post).
+   */
+  async function fetchAllVToolsV2Pages(url, firstPageData, requestConfig) {
+    const list = firstPageData?.data?.list;
+    if (!Array.isArray(list)) return firstPageData;
+
+    const limit = getVToolsV2Limit(url);
+
+    // Only paginate if the first page is full
+    if (list.length < limit) return firstPageData;
+
+    // Dedup guard
+    if (activeVToolsV2Runs.has(VTOOLSV2_ENDPOINT)) {
+      return null; // duplicate — caller must NOT post
+    }
+    activeVToolsV2Runs.add(VTOOLSV2_ENDPOINT);
+
+    try {
+      const allFilters = [...list];
+      const replayConfig = { method: 'GET', ...(requestConfig || {}) };
+      delete replayConfig.body;
+
+      console.log(
+        LOG_PREFIX,
+        `V-Tools V2 pagination: ${list.length} filters on first page, limit=${limit}, fetching forward…`
+      );
+
+      let pagesFetched = 0;
+
+      while (true) {
+        const lastItem = allFilters[allFilters.length - 1];
+        const cursor = lastItem?.created_at;
+        if (!cursor) break;
+
+        const result = await fetchVToolsV2Page(url, cursor, limit, replayConfig);
+        if (!result) break;
+
+        allFilters.push(...result.list);
+        pagesFetched++;
+
+        if (result.list.length === 0 || result.list.length < limit) break;
+      }
+
+      // Deduplicate by filter_id
+      const seen = new Set();
+      const unique = allFilters.filter((f) => {
+        if (!f?.filter_id) return true;
+        if (seen.has(f.filter_id)) return false;
+        seen.add(f.filter_id);
+        return true;
+      });
+
+      console.log(
+        LOG_PREFIX,
+        `V-Tools V2 pagination complete: ${pagesFetched} extra page(s), ${unique.length} unique filters`
+      );
+
+      return {
+        ...firstPageData,
+        data: {
+          ...firstPageData.data,
+          list: unique,
+          pagination: {
+            per_page: limit,
+            total_pages: 1,
+            total_entries: unique.length,
+          },
+        },
+      };
+    } finally {
+      activeVToolsV2Runs.delete(VTOOLSV2_ENDPOINT);
+    }
+  }
+
   // ─── Patch fetch() ─────────────────────────────────────────────────
 
   const originalFetch = window.fetch;
@@ -251,7 +379,7 @@
     if (!source) return originalFetch.apply(this, args);
 
     // Capture request config BEFORE the call
-    const requestConfig = source === 'souk' ? extractFetchConfig(args) : null;
+    const requestConfig = (source === 'souk' || source === 'vtoolsv2') ? extractFetchConfig(args) : null;
 
     let response;
     try {
@@ -268,6 +396,8 @@
           let data = json;
           if (source === 'souk') {
             data = await fetchAllSoukPages(url, json, requestConfig);
+          } else if (source === 'vtoolsv2') {
+            data = await fetchAllVToolsV2Pages(url, json, requestConfig);
           }
           if (data !== null) {
             postInterceptedData(source, data);
@@ -311,7 +441,7 @@
     const source = matchUrl(url);
 
     if (source) {
-      const xhrConfig = source === 'souk'
+      const xhrConfig = (source === 'souk' || source === 'vtoolsv2')
         ? { method: this.__filterExporterMethod || 'GET', headers: this.__filterExporterHeaders || null }
         : null;
 
@@ -323,6 +453,8 @@
               let data = json;
               if (source === 'souk') {
                 data = await fetchAllSoukPages(url, json, xhrConfig);
+              } else if (source === 'vtoolsv2') {
+                data = await fetchAllVToolsV2Pages(url, json, xhrConfig);
               }
               if (data !== null) {
                 postInterceptedData(source, data);
