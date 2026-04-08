@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Kops Filter Exporter",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Extract and export filters from V-Tools and Souk.to as universal CSV — by Kops, the fastest Vinted monitor",
   "homepage_url": "https://getkops.com",
   "author": "Kops",
