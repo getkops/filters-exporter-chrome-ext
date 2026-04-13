@@ -252,13 +252,19 @@
   }
 
   /**
-   * Build a V2 page URL using cursor-based pagination.
-   * Uses manual string construction to avoid URLSearchParams encoding
-   * the brackets in `created_at[lt]` into `created_at%5Blt%5D`.
+   * Build a V2 page URL using compound keyset pagination.
+   * Mirrors what the V-Tools app sends natively:
+   *   created_at[lt]=X&filter_id[lt]=Y&order=created_at,filter_id
+   * The two-field cursor handles created_at ties without skipping any items.
+   * Uses manual string construction to avoid URLSearchParams percent-encoding
+   * the brackets (e.g. created_at%5Blt%5D) which the server does not accept.
    */
   function buildVToolsV2PageUrl(originalUrl, cursor, limit) {
     const base = originalUrl.split('?')[0];
-    return `${base}?limit=${limit}&created_at[lt]=${cursor}&order=created_at`;
+    let url = `${base}?limit=${limit}&created_at[lt]=${cursor.created_at}`;
+    if (cursor.filter_id) url += `&filter_id[lt]=${cursor.filter_id}`;
+    url += `&order=created_at,filter_id`;
+    return url;
   }
 
   /**
@@ -284,8 +290,10 @@
 
   /**
    * Main V2 pagination orchestrator.
-   * Strategy: cursor-based using `created_at` of the last item.
-   * Stop when: list is empty or list.length < limit.
+   * Strategy: compound keyset cursor using (created_at, filter_id) of the last
+   * item — exactly what the V-Tools app does natively. This handles created_at
+   * ties perfectly: no items are skipped, no duplicates (but dedup runs anyway).
+   * Stop when: empty page, or seenIds has reached total_entries.
    * Returns null if a duplicate run is detected (caller must NOT post).
    */
   async function fetchAllVToolsV2Pages(url, firstPageData, requestConfig) {
@@ -293,9 +301,13 @@
     if (!Array.isArray(list)) return firstPageData;
 
     const limit = getVToolsV2Limit(url);
+    if (limit <= 0) return firstPageData; // bogus request (e.g. limit=0), skip
 
-    // Only paginate if the first page is full
-    if (list.length < limit) return firstPageData;
+    const totalEntries = firstPageData?.data?.pagination?.total_entries ?? null;
+
+    // Only paginate if more entries are expected beyond the first page
+    const moreEntriesExist = totalEntries !== null ? list.length < totalEntries : list.length >= limit;
+    if (!moreEntriesExist) return firstPageData;
 
     // Dedup guard
     if (activeVToolsV2Runs.has(VTOOLSV2_ENDPOINT)) {
@@ -308,25 +320,34 @@
       const replayConfig = { method: 'GET', ...(requestConfig || {}) };
       delete replayConfig.body;
 
+      const seenIds = new Set(list.map((f) => f?.filter_id).filter(Boolean));
+
       console.log(
         LOG_PREFIX,
-        `V-Tools V2 pagination: ${list.length} filters on first page, limit=${limit}, fetching forward…`
+        `V-Tools V2 pagination: ${list.length} filters on first page, limit=${limit}, total=${totalEntries ?? '?'}, fetching forward…`
       );
 
       let pagesFetched = 0;
 
       while (true) {
         const lastItem = allFilters[allFilters.length - 1];
-        const cursor = lastItem?.created_at;
-        if (!cursor) break;
+        if (!lastItem?.created_at) break;
+
+        // Compound cursor: mirrors the native app's pagination params exactly
+        const cursor = { created_at: lastItem.created_at, filter_id: lastItem.filter_id };
 
         const result = await fetchVToolsV2Page(url, cursor, limit, replayConfig);
-        if (!result) break;
+        if (!result || result.list.length === 0) break;
 
         allFilters.push(...result.list);
         pagesFetched++;
 
-        if (result.list.length === 0 || result.list.length < limit) break;
+        for (const f of result.list) {
+          if (f?.filter_id) seenIds.add(f.filter_id);
+        }
+
+        // Stop once we've collected at least as many unique items as the API reports
+        if (totalEntries !== null && seenIds.size >= totalEntries) break;
       }
 
       // Deduplicate by filter_id
@@ -340,7 +361,7 @@
 
       console.log(
         LOG_PREFIX,
-        `V-Tools V2 pagination complete: ${pagesFetched} extra page(s), ${unique.length} unique filters`
+        `V-Tools V2 pagination complete: ${pagesFetched} extra page(s), ${unique.length}/${totalEntries ?? '?'} unique filters`
       );
 
       return {
