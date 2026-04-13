@@ -42,7 +42,7 @@
 
   const REFRESH_TARGETS = {
     vtoolsv1: 'https://app.v-tools.com/dashboard/filtres',
-    vtoolsv2: 'https://dashboard.v-tools.com/',
+    vtoolsv2: 'https://dashboard.v-tools.com/dashboard/filters',
     souk: 'https://souk.to/app/alerts',
   };
 
