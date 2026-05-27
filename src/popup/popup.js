@@ -62,6 +62,7 @@
     'keywords_include', 'keywords_include_strict',
     'keywords_exclude', 'keywords_exclude_strict',
     'regions',
+    'isbns',
     'autocop', 'enabled',
   ];
 
@@ -178,6 +179,7 @@
       filter.brands,
       filter.catalogs,
       filter.video_game_platforms,
+      filter.isbns,
     ].filter(Boolean).join(' ').toLowerCase();
     return searchable.includes(query);
   }

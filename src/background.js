@@ -46,6 +46,32 @@ function safeArray(value) {
   return [];
 }
 
+/**
+ * Extract ISBNs into a pipe-delimited string, tolerating multiple shapes:
+ * plain string/number arrays (Souk), arrays of objects keyed by a probable
+ * field (V-Tools), or a bare string/number.
+ * @param {*} value
+ * @returns {string}
+ */
+function joinIsbns(value) {
+  if (value == null) return '';
+  const arr = Array.isArray(value) ? value : [value];
+  const KEYS = ['isbn', 'value', 'data', 'title', 'code', 'id'];
+  return arr
+    .map((item) => {
+      if (item == null) return '';
+      if (typeof item === 'object') {
+        for (const k of KEYS) {
+          if (item[k] != null) return String(item[k]);
+        }
+        return '';
+      }
+      return String(item);
+    })
+    .filter((s) => s !== '')
+    .join(' | ');
+}
+
 // ─── Parsers ───────────────────────────────────────────────────────
 
 /**
@@ -89,6 +115,7 @@ function normalizeVToolsFilter(filter) {
     keywords_exclude: '',
     keywords_exclude_strict: '',
     regions: '',
+    isbns: joinIsbns(filter.isbns ?? filter.isbn ?? filter.books),
     autocop: filter.website_metadata?.boosted === true ? 'yes' : 'no',
     enabled: filter.enabled === true ? 'yes' : 'no',
   };
@@ -169,6 +196,7 @@ function normalizeSoukFilter(alert) {
     keywords_exclude: '',
     keywords_exclude_strict: '',
     regions: '',
+    isbns: joinIsbns(alert.isbns),
     autocop: '',
     enabled: alert.is_deactivated === true ? 'no' : 'yes',
   };
@@ -295,6 +323,10 @@ function normalizeVToolsV2Filter(filter) {
     (id) => VTOOLSV2_REGIONS[id] || id
   );
 
+  // ISBNs: format unconfirmed — probe likely component types, then top-level fields
+  const isbnComp = comp.isbn || comp.isbns || comp.book || comp.barcode;
+  const isbnSource = isbnComp ? isbnComp.value : (filter.isbns ?? filter.isbn);
+
   return {
     source: 'V-Tools V2',
     name: String(name),
@@ -324,6 +356,7 @@ function normalizeVToolsV2Filter(filter) {
     keywords_exclude: (kwByOp['ncontains'] || []).join(' | '),
     keywords_exclude_strict: (kwByOp['strict_ncontains'] || []).join(' | '),
     regions: regionItems.join(' | '),
+    isbns: joinIsbns(isbnSource),
     autocop: filter.boosted === true ? 'yes' : 'no',
     enabled: filter.enabled === true ? 'yes' : 'no',
   };
@@ -381,6 +414,7 @@ const CSV_COLUMNS = [
   'keywords_include', 'keywords_include_strict',
   'keywords_exclude', 'keywords_exclude_strict',
   'regions',
+  'isbns',
   'autocop', 'enabled',
 ];
 
