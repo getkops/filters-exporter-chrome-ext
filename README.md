@@ -97,10 +97,15 @@ Install directly from the [**Chrome Web Store**](https://chromewebstore.google.c
 
 This extension is written in TypeScript and bundled with esbuild, so it must be built before loading.
 
+The toolchain (Node + pnpm) is pinned with [mise](https://mise.jdx.dev). Install mise once, then:
+
 ```bash
-pnpm install
-pnpm build        # bundles src/ → dist/
+mise install      # installs the pinned Node + pnpm (see mise.toml)
+pnpm install      # installs JS dependencies
+mise run build    # bundles src/ → dist/   (or: pnpm build)
 ```
+
+> Don't have mise? You can still use any Node ≥ 24 and pnpm 11 directly with `pnpm install && pnpm build` — mise just guarantees everyone uses the same versions.
 
 Then in Chrome:
 
@@ -121,9 +126,12 @@ Then in Chrome:
 | `pnpm build`         | Bundle `src/*.ts` → `dist/` (IIFE files Chrome loads)    |
 | `pnpm typecheck`     | `tsc --noEmit` strict type-check                          |
 | `pnpm test`          | Run the vitest suite against the fixture exports          |
+| `pnpm validate:exports` | Lint real exports dropped in `tmp/exports/` for bad data |
 | `pnpm anonymize`     | Scrub a raw V-Tools/Souk capture into a safe fixture      |
 | `pnpm verify:schema` | Fail if the vendored schema drifts from the Kops SSOT     |
 | `pnpm sync:schema`   | Copy the freshly generated schema from the Kops repo      |
+
+The common ones are also exposed as mise tasks — `mise run build` / `typecheck` / `test` / `validate`, and `mise run check` runs the full CI gate (typecheck + build + test) at once. CI provisions Node + pnpm with mise, so local and CI use identical versions (see `mise.toml`).
 
 ### Schema sync gate
 
@@ -146,6 +154,25 @@ Real captures (`example_*.json`) are **gitignored**. To turn one into a safe fix
 pnpm anonymize example_souk.json --out fixtures/my-scenario.json
 ```
 
+### Validating real exports
+
+To sanity-check real data the extension just produced — without committing it — drop the files into the gitignored `tmp/exports/` folder and run:
+
+```bash
+pnpm validate:exports                       # scan tmp/exports/*.json (verbose)
+pnpm validate:exports path/to/file.json     # or pass explicit files/dirs
+pnpm validate:exports tmp/exports --brief    # hide per-finding context detail
+pnpm validate:exports tmp/exports --json     # machine-readable report
+pnpm validate:exports tmp/exports --strict   # warnings also fail (exit 1)
+```
+
+It routes each file through the **exact production pipeline** (it imports the real `normalize.ts` + the vendored zod schema — no reimplementation, so what it checks is byte-for-byte what the extension exports) and accepts both shapes you can have on disk:
+
+- **Typed export envelopes** downloaded from the popup (`kops-filters-v1-*.json`) — validated directly against `filterExportEnvelopeSchema`.
+- **Raw API captures** (Souk `body.alerts` / V-Tools V2 `data.list`) — re-normalized, then schema-validated. Legacy V-Tools V1 (`data: [...]`) is reported as unsupported.
+
+On top of schema validation it runs integrity heuristics tiered by signal (errors → warnings → notes) to surface extraction bugs: unresolved regions (missing from `VTOOLSV2_REGIONS`), `price_min > price_max`, `*_ids`/`*_names` length mismatches, malformed/mangled text (U+FFFD or control chars), empty "husk" filters, bad ISBNs, empty keyword groups, and accidental copies (filters with identical criteria). Output is **verbose by default** — each finding prints the offending arrays/values as context, and an **"Action required"** section aggregates the de-duplicated `reg_…` ids you need to add to `VTOOLSV2_REGIONS`. Exit code is non-zero when any file has errors (or, under `--strict`, any warnings). Runs on Node ≥23.6 native TypeScript — no build step. `tmp/` is gitignored, so nothing you drop there is ever committed.
+
 ## How it works
 
 The extension uses a **fetch/XHR monkey-patching** technique via content scripts — no `chrome.debugger`, so there's no yellow debugging banner.
@@ -163,12 +190,15 @@ inject.ts (page MAIN world) → content.ts (content script) → background.ts (s
 
 ```
 ├── manifest.json                # Manifest V3 (points at dist/)
+├── mise.toml                    # pinned Node + pnpm toolchain + task shortcuts
+├── pnpm-workspace.yaml          # pnpm settings (build-script allow-list)
 ├── build.mjs                    # esbuild bundler
 ├── tsconfig.json                # strict TypeScript config
 ├── vitest.config.ts             # node-env test config
 ├── scripts/
 │   ├── sync-schema.mjs          # cross-repo schema sync / drift gate
-│   └── anonymize-export.mjs     # scrub a raw capture into a safe fixture
+│   ├── anonymize-export.mjs     # scrub a raw capture into a safe fixture
+│   └── validate-export.ts       # integrity linter for real exports (tmp/exports/)
 ├── fixtures/                    # committed SYNTHETIC example exports (tests)
 ├── src/
 │   ├── inject.ts                # fetch/XHR interception + pagination (page context)
@@ -188,7 +218,7 @@ inject.ts (page MAIN world) → content.ts (content script) → background.ts (s
 
 ## Contributing
 
-Contributions are welcome! Feel free to open issues or submit pull requests. Run `pnpm typecheck && pnpm build && pnpm test` before pushing.
+Contributions are welcome! Feel free to open issues or submit pull requests. Run `mise run check` (typecheck + build + test) before pushing.
 
 ## License
 

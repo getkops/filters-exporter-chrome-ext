@@ -14,10 +14,11 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": false,
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "build.mjs", "scripts/**/*.mjs"],
+  "include": ["src/**/*.ts", "build.mjs", "scripts/**/*.ts", "scripts/**/*.mjs"],
   "exclude": ["node_modules", "dist"]
 }

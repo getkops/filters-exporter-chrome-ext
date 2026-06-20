@@ -1,0 +1,8 @@
+# pnpm settings. As of pnpm 10/11 the `pnpm.*` field in package.json is no longer
+# read — package-level settings live here instead.
+#
+# pnpm blocks dependency build scripts by default. esbuild runs a postinstall to
+# set up its platform binary, so it must be explicitly allowed or `pnpm build`
+# fails with a missing-binary error. `allowBuilds` is pnpm 11's approval map.
+allowBuilds:
+  esbuild: true

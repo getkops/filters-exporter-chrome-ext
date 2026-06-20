@@ -4,6 +4,13 @@ example_*.csv
 store/*
 *.zip
 
+# macOS folder metadata
+.DS_Store
+
+# Ephemeral scratch space. Drop real V-Tools / Souk exports into tmp/exports/ and
+# run `pnpm validate:exports` to lint them — never committed (may contain account data).
+tmp/
+
 # dist/ is the build output Chrome loads when the repo is loaded unpacked, so it
 # is committed. Explicitly un-ignore it to override a global gitignore that
 # excludes dist/ by default.

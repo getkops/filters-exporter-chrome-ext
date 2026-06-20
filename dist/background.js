@@ -4188,7 +4188,10 @@
     reg_kNBKTCh4isES5pHEziYCu: "BE",
     reg_klRNv4mJo4yIpzBVU8dHH: "GB",
     reg_mijK7mEf0YR5zRPLgckFz: "GR",
-    reg_oA7keE3ctUtgQgwFbmaqu: "PT"
+    reg_oA7keE3ctUtgQgwFbmaqu: "PT",
+    reg_oDzN69ri9CETdPqD7JnnK: "HU",
+    reg_uBe5PkXuoVz8e2xLc44oT: "RO",
+    reg_uxkr8QRsZIC932Svc9MeG: "SK"
   };
   function normalizeSoukFilter(alert) {
     if (!alert || typeof alert !== "object") return null;

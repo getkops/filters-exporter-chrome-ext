@@ -1,0 +1,36 @@
+# Toolchain pinned with mise (https://mise.jdx.dev).
+#
+# mise provisions the exact Node + pnpm used both locally and in CI, so there is
+# one source of truth for tool versions. Getting started:
+#
+#   mise install          # install the pinned Node + pnpm below
+#   pnpm install          # install JS dependencies (pnpm comes from mise)
+#   mise run check        # typecheck + build + test (the CI gate)
+#
+# `mise run <task>` is the primary entrypoint; the tasks just delegate to the
+# pnpm scripts in package.json so there is a single implementation.
+
+[tools]
+node = "24.17.0"          # Active LTS
+"npm:pnpm" = "11.8.0"     # latest stable (npm backend: pnpm's standalone release
+                          # asset names aren't matched by mise's aqua registry yet)
+
+[tasks.typecheck]
+description = "Strict type-check (tsc --noEmit)"
+run = "pnpm typecheck"
+
+[tasks.build]
+description = "Bundle src/*.ts into dist/ (the files Chrome loads)"
+run = "pnpm build"
+
+[tasks.test]
+description = "Run the vitest suite"
+run = "pnpm test"
+
+[tasks.validate]
+description = "Lint real exports dropped in tmp/exports/"
+run = "pnpm validate:exports"
+
+[tasks.check]
+description = "Full local gate: typecheck + build + test (what CI runs)"
+depends = ["typecheck", "build", "test"]

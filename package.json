@@ -8,6 +8,7 @@
     "build": "node build.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "validate:exports": "node scripts/validate-export.ts",
     "anonymize": "node scripts/anonymize-export.mjs",
     "sync:schema": "node scripts/sync-schema.mjs",
     "verify:schema": "node scripts/sync-schema.mjs --check"
@@ -19,10 +20,5 @@
     "typescript": "^5.7.0",
     "vitest": "^2.1.0",
     "zod": "^3.24.0"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild"
-    ]
   }
 }

@@ -162,6 +162,16 @@ describe('V-Tools V2 regions', () => {
     expect(f.region_isos).toEqual(['FR', 'DE', 'reg_x']);
     expect(VTOOLSV2_REGIONS['reg_SxvmyclwnGwJU22Yi0L4l']).toBe('DE');
   });
+
+  it('resolves the HU/RO/SK regions added from the V-Tools regions list', () => {
+    expect(VTOOLSV2_REGIONS['reg_oDzN69ri9CETdPqD7JnnK']).toBe('HU');
+    expect(VTOOLSV2_REGIONS['reg_uBe5PkXuoVz8e2xLc44oT']).toBe('RO');
+    expect(VTOOLSV2_REGIONS['reg_uxkr8QRsZIC932Svc9MeG']).toBe('SK');
+    const f = withComponents(
+      comp('contains', 'region', ['reg_uxkr8QRsZIC932Svc9MeG', 'reg_oDzN69ri9CETdPqD7JnnK', 'reg_uBe5PkXuoVz8e2xLc44oT']),
+    );
+    expect(f.region_isos).toEqual(['SK', 'HU', 'RO']);
+  });
 });
 
 describe('V-Tools V2 price', () => {
