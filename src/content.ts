@@ -7,6 +7,8 @@
  * race with page scripts.
  */
 
+import { DIAG_MSG_TYPE, DIAG_ACTION } from './diagnostics';
+
 (function () {
   'use strict';
 
@@ -29,8 +31,20 @@
     // Only accept messages from the same window.
     if (event.source !== window) return;
 
-    const msg = event.data as InterceptedMessage | null;
-    if (!msg || msg.type !== MSG_TYPE) return;
+    const msg = event.data as (InterceptedMessage & { event?: unknown }) | null;
+    if (!msg || typeof msg.type !== 'string') return;
+
+    // Diagnostics: best-effort forward to the worker's debug ring buffer.
+    if (msg.type === DIAG_MSG_TYPE) {
+      try {
+        chrome.runtime.sendMessage({ action: DIAG_ACTION, event: msg.event });
+      } catch {
+        /* diagnostics must never disrupt the page */
+      }
+      return;
+    }
+
+    if (msg.type !== MSG_TYPE) return;
 
     if (!msg.source || typeof msg.source !== 'string') {
       console.warn(LOG_PREFIX, 'Invalid message: missing source');

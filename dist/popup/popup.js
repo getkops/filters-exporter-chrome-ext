@@ -4118,6 +4118,8 @@
     const refreshDropdown = $("refreshDropdown");
     const refreshBtn = $("refreshBtn");
     const refreshMenu = $("refreshMenu");
+    const debugExportBtn = $("debugExportBtn");
+    const debugIncludeFilters = $("debugIncludeFilters");
     let isExporting = false;
     let allFilters = [];
     let visibleIndices = [];
@@ -4455,6 +4457,34 @@
         console.error(LOG_PREFIX, "Clear failed:", err);
         showToast("Clear failed \u2014 try again", "error");
         clearBtn.disabled = false;
+      }
+    });
+    debugExportBtn.addEventListener("click", async () => {
+      debugExportBtn.disabled = true;
+      try {
+        const response = await sendMessage({
+          action: "EXPORT_DEBUG",
+          includeFilters: debugIncludeFilters.checked,
+          environment: { userAgent: navigator.userAgent, language: navigator.language }
+        });
+        if (!response.ok || !response.json) {
+          showToast(response.error || "Debug export failed", "error");
+          return;
+        }
+        const filename = response.filename || `kops-debug-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.json`;
+        downloadJSON(response.json, filename);
+        let copied = false;
+        try {
+          await navigator.clipboard.writeText(response.json);
+          copied = true;
+        } catch {
+        }
+        showToast(copied ? "Debug session saved + copied" : "Debug session saved", "success");
+      } catch (err) {
+        console.error(LOG_PREFIX, "Debug export failed:", err);
+        showToast("Debug export failed \u2014 try again", "error");
+      } finally {
+        debugExportBtn.disabled = false;
       }
     });
     refreshBtn.addEventListener("click", (e) => {

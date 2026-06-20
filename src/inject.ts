@@ -3,56 +3,39 @@
  * context). Monkey-patches fetch() and XMLHttpRequest to intercept API
  * responses from V-Tools V2 and Souk.to filter endpoints.
  *
- * For Souk.to and V-Tools V2: automatically fetches ALL paginated pages by
- * replaying the original request's auth context (headers, credentials).
- *  - Souk: only trusts `has_next_page`; all other pagination metadata is
- *    unreliable.
- *  - V-Tools V2: compound keyset cursor (created_at, filter_id) — exactly what
- *    the native app sends.
+ * This file owns ONLY page-world concerns: patching the network primitives,
+ * capturing the request's auth context for replay, collapsing concurrent runs,
+ * and posting results to the content script. The actual "rebuild the complete
+ * filter set" logic lives in ./paginate — a pure, fetch-injected, unit-tested
+ * engine. Whichever page the app requested (page 1 on load, page N on scroll),
+ * the engine rebuilds the COMPLETE set from the first page, so the service
+ * worker's replace-in-storage is always correct, and returns `null` on any
+ * partial failure so a flaky network never clobbers a captured set.
  *
  * Legacy V-Tools V1 is intentionally NOT intercepted (dropped in v2.0.0).
  */
+
+import { matchAdapter, paginateAll, type AnyAdapter } from './paginate';
+import { shapeOf, urlParamKeys, DIAG_MSG_TYPE, type DiagSink } from './diagnostics';
 
 (function () {
   'use strict';
 
   const LOG_PREFIX = '[Kops Filter Exporter]';
   const MSG_TYPE = '__FILTER_EXPORTER_INTERCEPTED__';
-  const SOUK_ENDPOINT = 'api.souk.to/api/v1/matching_alert/web';
-  const VTOOLSV2_ENDPOINT = 'www.v-tools.com/api/vinted/filters/list';
-
-  type InterceptSource = 'vtoolsv2' | 'souk';
-
-  interface InterceptPattern {
-    source: InterceptSource;
-    pattern: string;
-  }
-
-  const INTERCEPT_PATTERNS: InterceptPattern[] = [
-    { source: 'vtoolsv2', pattern: VTOOLSV2_ENDPOINT },
-    { source: 'souk', pattern: SOUK_ENDPOINT },
-  ];
 
   interface ReplayConfig {
-    method?: string;
     credentials?: RequestCredentials;
     headers?: Record<string, string>;
-    body?: unknown;
   }
 
-  // ─── URL matching ──────────────────────────────────────────────────
-
-  function matchUrl(url: string): InterceptSource | null {
-    if (!url || typeof url !== 'string') return null;
-    for (const entry of INTERCEPT_PATTERNS) {
-      if (url.includes(entry.pattern)) return entry.source;
-    }
-    return null;
-  }
+  // The page's real fetch, captured before patching — used by the paginator so
+  // its own page fetches are never re-intercepted (no recursion).
+  const originalFetch = window.fetch.bind(window);
 
   // ─── Messaging ─────────────────────────────────────────────────────
 
-  function postInterceptedData(source: InterceptSource, data: unknown): void {
+  function postInterceptedData(source: string, data: unknown): void {
     try {
       window.postMessage({ type: MSG_TYPE, source, data }, '*');
     } catch (err) {
@@ -75,7 +58,6 @@
       const config: ReplayConfig = {};
       const first = args[0];
       if (first instanceof Request) {
-        config.method = first.method || 'GET';
         config.credentials = first.credentials || undefined;
         if (first.headers) config.headers = headersToPlainObject(first.headers);
         return config;
@@ -83,13 +65,12 @@
       const init = args[1];
       if (init && typeof init === 'object') {
         const reqInit = init as RequestInit;
-        config.method = reqInit.method || 'GET';
         config.credentials = reqInit.credentials || undefined;
         if (reqInit.headers) {
           config.headers =
             reqInit.headers instanceof Headers
               ? headersToPlainObject(reqInit.headers)
-              : ({ ...(reqInit.headers as Record<string, string>) });
+              : { ...(reqInit.headers as Record<string, string>) };
         }
         return config;
       }
@@ -100,321 +81,165 @@
     }
   }
 
-  // ─── Souk.to pagination engine ─────────────────────────────────────
-
-  interface SoukResponse {
-    type?: string;
-    body?: {
-      alerts?: SoukAlert[];
-      pagination?: { has_next_page?: boolean; [k: string]: unknown };
-    };
-    [k: string]: unknown;
-  }
-  interface SoukAlert {
-    id?: string;
-    [k: string]: unknown;
+  /** Build the replay RequestInit: always GET, auth context preserved, no body. */
+  function toReplayInit(config: ReplayConfig | null): RequestInit {
+    const init: RequestInit = { method: 'GET' };
+    if (config?.credentials) init.credentials = config.credentials;
+    if (config?.headers) init.headers = config.headers;
+    return init;
   }
 
-  /** Tracks Souk queries currently being paginated (keyed by status+search). */
-  const activePaginationRuns = new Set<string>();
+  // ─── Run coordination ──────────────────────────────────────────────
 
-  function getSoukQueryKey(url: string): string {
-    const status = url.match(/[?&]status=([^&]*)/)?.[1] || 'all';
-    const search = url.match(/[?&]search=([^&]*)/)?.[1] || '';
-    return `${SOUK_ENDPOINT}?status=${status}&search=${search}`;
-  }
+  /** Logical queries currently being paginated, keyed by adapter.runKey(url). */
+  const activeRuns = new Set<string>();
+  /**
+   * Logical queries already captured in THIS page load. This script re-executes
+   * on every full page reload but its state persists across SPA navigation /
+   * scroll — so it naturally limits the full re-fetch to "once per reload":
+   * manual paging is skipped; a reload (or the popup's Refresh, which opens a
+   * fresh tab) re-runs the capture.
+   */
+  const completedRuns = new Set<string>();
 
-  function getPageNumber(url: string): number | null {
-    const match = url.match(/[?&]page=(\d+)/);
-    return match ? parseInt(match[1], 10) : null;
-  }
-
-  function buildSoukPageUrl(originalUrl: string, pageNumber: number): string {
-    const status = originalUrl.match(/[?&]status=([^&]*)/)?.[1] || 'all';
-    const search = originalUrl.match(/[?&]search=([^&]*)/)?.[1] || '';
-    return `https://${SOUK_ENDPOINT}?page=${pageNumber}&status=${status}&search=${encodeURIComponent(decodeURIComponent(search))}`;
-  }
-
-  async function fetchSoukPage(
-    url: string,
-    pageNumber: number,
-    replayConfig: ReplayConfig,
-  ): Promise<{ alerts: SoukAlert[]; has_next_page: boolean } | null> {
-    const pageUrl = buildSoukPageUrl(url, pageNumber);
+  /**
+   * Structured diagnostics sink: logs to the page console for live debugging AND
+   * forwards the event to the service worker's debug ring buffer (via the content
+   * script). Wrapped so diagnostics can never throw into the capture flow.
+   */
+  const diag: DiagSink = (input) => {
     try {
-      const response = await originalFetch(pageUrl, replayConfig as RequestInit);
-      if (!response.ok) {
-        console.warn(LOG_PREFIX, `Souk page ${pageNumber}: HTTP ${response.status}`);
-        return null;
-      }
-      const json = (await response.json()) as SoukResponse;
-      if (json?.type !== 'success' || !json?.body) return null;
-      return {
-        alerts: json.body.alerts || [],
-        has_next_page: json.body.pagination?.has_next_page || false,
-      };
-    } catch (err) {
-      console.warn(LOG_PREFIX, `Souk page ${pageNumber} fetch failed:`, (err as Error)?.message ?? err);
-      return null;
+      const log = input.level === 'error' || input.level === 'warn' ? console.warn : console.log;
+      log(LOG_PREFIX, input.stage, input.message ?? '', input.detail ?? '');
+    } catch {
+      /* ignore */
     }
-  }
-
-  async function fetchAllSoukPages(
-    url: string,
-    firstPageData: SoukResponse,
-    requestConfig: ReplayConfig | null,
-  ): Promise<SoukResponse | null> {
-    const pagination = firstPageData?.body?.pagination;
-    if (!pagination) return firstPageData;
-    if (!pagination.has_next_page) return firstPageData;
-
-    const startPage = getPageNumber(url);
-    if (startPage === null) return firstPageData; // malformed URL — skip pagination
-
-    const queryKey = getSoukQueryKey(url);
-    if (activePaginationRuns.has(queryKey)) return null; // duplicate — caller must NOT post
-    activePaginationRuns.add(queryKey);
-
     try {
-      const allAlerts: SoukAlert[] = [...(firstPageData.body?.alerts || [])];
-      const replayConfig: ReplayConfig = { method: 'GET', ...(requestConfig || {}) };
-      delete replayConfig.body;
-
-      console.log(
-        LOG_PREFIX,
-        `Souk pagination: starting from page ${startPage}, has_next_page=true, fetching forward…`,
-      );
-
-      let currentPage = startPage;
-      let pagesFetched = 0;
-
-      for (;;) {
-        currentPage++;
-        const result = await fetchSoukPage(url, currentPage, replayConfig);
-        if (!result) break;
-        allAlerts.push(...result.alerts);
-        pagesFetched++;
-        if (result.alerts.length === 0) break;
-        if (!result.has_next_page) break;
-      }
-
-      const seen = new Set<string>();
-      const uniqueAlerts = allAlerts.filter((alert) => {
-        if (!alert || !alert.id) return true;
-        if (seen.has(alert.id)) return false;
-        seen.add(alert.id);
-        return true;
-      });
-
-      console.log(
-        LOG_PREFIX,
-        `Souk pagination complete: page ${startPage} intercepted + ${pagesFetched} forward, ${uniqueAlerts.length} unique alerts`,
-      );
-
-      return {
-        ...firstPageData,
-        body: {
-          ...firstPageData.body,
-          alerts: uniqueAlerts,
-          pagination: {
-            current_page: 1,
-            total_pages: 1,
-            total_count: uniqueAlerts.length,
-            page_size: uniqueAlerts.length,
-            has_next_page: false,
-          },
-        },
-      };
-    } finally {
-      activePaginationRuns.delete(queryKey);
+      window.postMessage({ type: DIAG_MSG_TYPE, event: { ...input, ctx: 'inject' } }, '*');
+    } catch {
+      /* ignore */
     }
-  }
+  };
 
-  // ─── V-Tools V2 pagination engine ──────────────────────────────────
-
-  interface VToolsV2Response {
-    success?: boolean;
-    data?: {
-      list?: VToolsV2Filter[];
-      pagination?: { total_entries?: number; [k: string]: unknown };
-    };
-    [k: string]: unknown;
-  }
-  interface VToolsV2Filter {
-    filter_id?: string;
-    created_at?: number;
-    [k: string]: unknown;
-  }
-  interface V2Cursor {
-    created_at?: number;
-    filter_id?: string;
-  }
-
-  const activeVToolsV2Runs = new Set<string>();
-
-  function getVToolsV2Limit(url: string): number {
-    const match = url.match(/[?&]limit=(\d+)/);
-    return match ? parseInt(match[1], 10) : 20;
-  }
-
-  function buildVToolsV2PageUrl(originalUrl: string, cursor: V2Cursor, limit: number): string {
-    const base = originalUrl.split('?')[0];
-    let url = `${base}?limit=${limit}&created_at[lt]=${cursor.created_at}`;
-    if (cursor.filter_id) url += `&filter_id[lt]=${cursor.filter_id}`;
-    url += `&order=created_at,filter_id`;
-    return url;
-  }
-
-  async function fetchVToolsV2Page(
-    originalUrl: string,
-    cursor: V2Cursor,
-    limit: number,
-    replayConfig: ReplayConfig,
-  ): Promise<{ list: VToolsV2Filter[] } | null> {
-    const pageUrl = buildVToolsV2PageUrl(originalUrl, cursor, limit);
-    try {
-      const response = await originalFetch(pageUrl, replayConfig as RequestInit);
-      if (!response.ok) {
-        console.warn(LOG_PREFIX, `V-Tools V2 cursor=${JSON.stringify(cursor)}: HTTP ${response.status}`);
-        return null;
-      }
-      const json = (await response.json()) as VToolsV2Response;
-      if (json?.success !== true || !Array.isArray(json?.data?.list)) return null;
-      return { list: json.data.list };
-    } catch (err) {
-      console.warn(LOG_PREFIX, `V-Tools V2 page fetch failed:`, (err as Error)?.message ?? err);
-      return null;
-    }
-  }
-
-  async function fetchAllVToolsV2Pages(
-    url: string,
-    firstPageData: VToolsV2Response,
-    requestConfig: ReplayConfig | null,
-  ): Promise<VToolsV2Response | null> {
-    const list = firstPageData?.data?.list;
-    if (!Array.isArray(list)) return firstPageData;
-
-    const limit = getVToolsV2Limit(url);
-    if (limit <= 0) return firstPageData;
-
-    const totalEntries = firstPageData?.data?.pagination?.total_entries ?? null;
-    const moreEntriesExist =
-      totalEntries !== null ? list.length < totalEntries : list.length >= limit;
-    if (!moreEntriesExist) return firstPageData;
-
-    if (activeVToolsV2Runs.has(VTOOLSV2_ENDPOINT)) return null;
-    activeVToolsV2Runs.add(VTOOLSV2_ENDPOINT);
-
-    try {
-      const allFilters: VToolsV2Filter[] = [...list];
-      const replayConfig: ReplayConfig = { method: 'GET', ...(requestConfig || {}) };
-      delete replayConfig.body;
-
-      const seenIds = new Set<string>(
-        list.map((f) => f?.filter_id).filter((id): id is string => Boolean(id)),
-      );
-
-      console.log(
-        LOG_PREFIX,
-        `V-Tools V2 pagination: ${list.length} filters on first page, limit=${limit}, total=${totalEntries ?? '?'}, fetching forward…`,
-      );
-
-      let pagesFetched = 0;
-
-      for (;;) {
-        const lastItem = allFilters[allFilters.length - 1];
-        if (!lastItem?.created_at) break;
-        const cursor: V2Cursor = { created_at: lastItem.created_at, filter_id: lastItem.filter_id };
-        const result = await fetchVToolsV2Page(url, cursor, limit, replayConfig);
-        if (!result || result.list.length === 0) break;
-        allFilters.push(...result.list);
-        pagesFetched++;
-        for (const f of result.list) {
-          if (f?.filter_id) seenIds.add(f.filter_id);
-        }
-        if (totalEntries !== null && seenIds.size >= totalEntries) break;
-      }
-
-      const seen = new Set<string>();
-      const unique = allFilters.filter((f) => {
-        if (!f?.filter_id) return true;
-        if (seen.has(f.filter_id)) return false;
-        seen.add(f.filter_id);
-        return true;
-      });
-
-      console.log(
-        LOG_PREFIX,
-        `V-Tools V2 pagination complete: ${pagesFetched} extra page(s), ${unique.length}/${totalEntries ?? '?'} unique filters`,
-      );
-
-      return {
-        ...firstPageData,
-        data: {
-          ...firstPageData.data,
-          list: unique,
-          pagination: {
-            per_page: limit,
-            total_pages: 1,
-            total_entries: unique.length,
-          },
-        },
-      };
-    } finally {
-      activeVToolsV2Runs.delete(VTOOLSV2_ENDPOINT);
-    }
-  }
-
-  // ─── Shared post-processing ────────────────────────────────────────
-
+  /**
+   * Assemble the complete set for an intercepted response and post it. Skips
+   * when (a) the body isn't a usable success payload, (b) this query was already
+   * captured this page load (manual paging), (c) a run for it is already in
+   * flight, or (d) pagination failed partway — never posting a partial/stale set.
+   */
   async function processAndPost(
-    source: InterceptSource,
+    adapter: AnyAdapter,
     url: string,
-    json: unknown,
+    interceptedJson: unknown,
     requestConfig: ReplayConfig | null,
   ): Promise<void> {
-    if (!json || typeof json !== 'object') return;
-    let data: unknown = json;
-    if (source === 'souk') {
-      data = await fetchAllSoukPages(url, json as SoukResponse, requestConfig);
-    } else if (source === 'vtoolsv2') {
-      data = await fetchAllVToolsV2Pages(url, json as VToolsV2Response, requestConfig);
+    // Only paginate genuine success payloads — skip errors / unexpected shapes.
+    // shapeOf runs HERE (page side) so the raw body never crosses the wire —
+    // only its structure (keys + types, no values) reaches the debug buffer.
+    const parsed = adapter.parse(interceptedJson);
+    if (!parsed) {
+      diag({
+        stage: 'parse_fail',
+        source: adapter.source,
+        message: 'intercepted body was not a usable success payload',
+        detail: { shape: JSON.stringify(shapeOf(interceptedJson)) },
+      });
+      return;
     }
-    if (data !== null) postInterceptedData(source, data);
+
+    const runKey = adapter.runKey(url);
+    if (completedRuns.has(runKey)) {
+      // Console only — manual paging is high-volume and would crowd the buffer.
+      console.log(LOG_PREFIX, `${adapter.source}: already captured this load — skipping (reload to refresh)`);
+      return;
+    }
+    if (activeRuns.has(runKey)) return; // a run for this query is already going
+    activeRuns.add(runKey);
+    // Proof the inject ran AND the endpoint matched with a valid body — the
+    // anchor the support bundle uses to tell "ran but failed" from "never ran".
+    // When the matched body is EMPTY (e.g. a count-probe call, or a moved data
+    // key), attach its shape + the request's param KEYS so the cause is obvious.
+    diag({
+      stage: 'intercept',
+      source: adapter.source,
+      count: parsed.items.length,
+      detail:
+        parsed.items.length === 0
+          ? {
+              total: parsed.total ?? null,
+              params: urlParamKeys(url),
+              shape: JSON.stringify(shapeOf(interceptedJson)),
+            }
+          : undefined,
+    });
+
+    try {
+      // Seed from the intercepted body when it is the first page of the set, so
+      // we don't re-issue a request the app already made (and don't break the
+      // single-page V-Tools path). Otherwise rebuild from the first page.
+      const seed = adapter.isFirstPageRequest(url) ? parsed : undefined;
+      const result = await paginateAll(
+        adapter,
+        url,
+        originalFetch,
+        toReplayInit(requestConfig),
+        seed,
+        diag,
+      );
+      if (result !== null) {
+        const count = adapter.count(result);
+        const total = adapter.expectedTotal(result);
+        const complete = total === null || count >= total;
+        // Only gate future requests once we have a SATISFACTORY capture. An empty
+        // or short response (V-Tools' count-probe call, or a truncated list
+        // during an outage) must NOT block the real list request that follows.
+        if (count > 0 && complete) completedRuns.add(runKey);
+        console.log(
+          LOG_PREFIX,
+          `Captured ${count}/${total ?? '?'} ${adapter.source} filters${count > 0 && complete ? '' : ' (will retry)'}`,
+        );
+        postInterceptedData(adapter.source, result);
+      } else {
+        console.warn(LOG_PREFIX, `${adapter.source}: incomplete capture — kept previous data`);
+      }
+    } catch (err) {
+      console.warn(LOG_PREFIX, 'Pagination run failed:', (err as Error)?.message ?? err);
+    } finally {
+      activeRuns.delete(runKey);
+    }
+  }
+
+  // ─── URL helper ────────────────────────────────────────────────────
+
+  function urlOf(request: unknown): string {
+    try {
+      if (typeof request === 'string') return request;
+      if (request instanceof Request) return request.url;
+      return String((request as URL | undefined)?.toString?.() ?? '');
+    } catch {
+      return '';
+    }
   }
 
   // ─── Patch fetch() ─────────────────────────────────────────────────
 
-  const originalFetch = window.fetch.bind(window);
-
-  window.fetch = async function (this: unknown, ...args: Parameters<typeof fetch>): Promise<Response> {
-    let url = '';
-    try {
-      const request = args[0];
-      url =
-        typeof request === 'string'
-          ? request
-          : request instanceof Request
-            ? request.url
-            : String((request as URL | undefined)?.toString?.() ?? '');
-    } catch {
-      return originalFetch(...args);
-    }
-
-    const source = matchUrl(url);
-    if (!source) return originalFetch(...args);
+  window.fetch = async function (
+    this: unknown,
+    ...args: Parameters<typeof fetch>
+  ): Promise<Response> {
+    const url = urlOf(args[0]);
+    const adapter = url ? matchAdapter(url) : null;
+    if (!adapter) return originalFetch(...args);
 
     const requestConfig = extractFetchConfig(args as unknown[]);
-
     const response = await originalFetch(...args);
 
-    // Clone and parse in background — never block the original response.
+    // Clone and parse in the background — never block the original response.
     try {
       const clone = response.clone();
       clone
         .json()
-        .then((json) => processAndPost(source, url, json, requestConfig))
+        .then((json) => processAndPost(adapter, url, json, requestConfig))
         .catch(() => {});
     } catch (cloneErr) {
       console.warn(LOG_PREFIX, 'Failed to clone response:', cloneErr);
@@ -427,7 +252,6 @@
 
   interface PatchedXHR extends XMLHttpRequest {
     __filterExporterUrl?: string;
-    __filterExporterMethod?: string;
     __filterExporterHeaders?: Record<string, string> | null;
   }
 
@@ -443,7 +267,6 @@
   ): void {
     try {
       this.__filterExporterUrl = typeof url === 'string' ? url : String(url);
-      this.__filterExporterMethod = method || 'GET';
       this.__filterExporterHeaders = null;
     } catch {
       this.__filterExporterUrl = '';
@@ -471,18 +294,15 @@
     ...args: Parameters<XMLHttpRequest['send']>
   ): void {
     const url = this.__filterExporterUrl || '';
-    const source = matchUrl(url);
+    const adapter = url ? matchAdapter(url) : null;
 
-    if (source) {
-      const xhrConfig: ReplayConfig = {
-        method: this.__filterExporterMethod || 'GET',
-        headers: this.__filterExporterHeaders || undefined,
-      };
+    if (adapter) {
+      const xhrConfig: ReplayConfig = { headers: this.__filterExporterHeaders || undefined };
       this.addEventListener('load', function (this: PatchedXHR) {
         try {
           if (this.status >= 200 && this.status < 300 && this.responseText) {
             const json = JSON.parse(this.responseText);
-            void processAndPost(source, url, json, xhrConfig);
+            void processAndPost(adapter, url, json, xhrConfig);
           }
         } catch {
           /* ignore parse errors */

@@ -4,6 +4,9 @@ example_*.csv
 store/*
 *.zip
 
+# Exported debug-session bundles (support artifacts — may contain user data).
+kops-debug-*.json
+
 # macOS folder metadata
 .DS_Store
 

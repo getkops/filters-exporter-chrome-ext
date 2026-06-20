@@ -499,6 +499,59 @@ body {
   padding-top: 4px;
 }
 
+.footer-debug {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.debug-include {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.debug-include input {
+  width: 13px;
+  height: 13px;
+  accent-color: var(--accent-primary);
+  cursor: pointer;
+}
+
+.debug-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-tertiary);
+  font-family: var(--font);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  padding: 4px 9px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.debug-btn:hover {
+  color: var(--text-secondary);
+  border-color: var(--border-default);
+  background: var(--bg-secondary);
+}
+
+.debug-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* ─── Toast Notification ───────────────────────────────────────── */
 
 .toast {

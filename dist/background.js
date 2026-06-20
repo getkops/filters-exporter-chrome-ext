@@ -4333,10 +4333,12 @@
       errors.push(`V-Tools V2 API returned success: ${String(r.success ?? "undefined")}`);
     }
     const data = r.data;
+    const pagination = data?.pagination;
+    const expectedTotal = typeof pagination?.total_entries === "number" ? pagination.total_entries : null;
     const list = data?.list;
     if (!Array.isArray(list)) {
       errors.push("V-Tools V2 response.data.list is not an array");
-      return { filters: [], errors };
+      return { filters: [], errors, expectedTotal };
     }
     const filters = [];
     list.forEach((raw, index) => {
@@ -4344,7 +4346,104 @@
       if (normalized) filters.push(normalized);
       else errors.push(`V-Tools V2 filter at index ${index} skipped (invalid or unnamed)`);
     });
-    return { filters, errors };
+    return { filters, errors, expectedTotal };
+  }
+
+  // src/diagnostics.ts
+  var DIAG_ACTION = "DIAG_EVENT";
+  var EXPORT_DEBUG_ACTION = "EXPORT_DEBUG";
+  var SECRET_PATTERNS = [
+    /bearer\s+[A-Za-z0-9._\-]+/gi,
+    /\b(?:authorization|token|api[_-]?key|access[_-]?token|refresh[_-]?token|secret|password|passwd|cookie|session)\b\s*[:=]\s*[^\s,&;]+/gi,
+    /\b[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{6,}\b/g,
+    // JWT-ish
+    /\b[A-Fa-f0-9]{32,}\b/g
+    // long hex (session ids / hashes)
+  ];
+  function redactSecrets(text) {
+    let out = text;
+    for (const re of SECRET_PATTERNS) out = out.replace(re, "[redacted]");
+    return out;
+  }
+  var DIAG_BUFFER_CAP = 300;
+  function pushEvent(buffer, event, cap = DIAG_BUFFER_CAP) {
+    const next = buffer.length >= cap ? buffer.slice(buffer.length - cap + 1) : buffer.slice();
+    next.push(event);
+    return next;
+  }
+  function defaultLevel(stage) {
+    switch (stage) {
+      case "http_error":
+      case "fetch_error":
+      case "pagination_aborted":
+      case "store_fail":
+      case "parse_fail":
+        return "error";
+      case "capture_empty":
+        return "warn";
+      default:
+        return "info";
+    }
+  }
+  function toEvent(input, ctx, now = (/* @__PURE__ */ new Date()).toISOString()) {
+    const event = {
+      ...input,
+      ts: now,
+      ctx: input.ctx ?? ctx,
+      level: input.level ?? defaultLevel(input.stage)
+    };
+    if (event.message) event.message = redactSecrets(event.message);
+    if (event.detail) {
+      const safe = {};
+      for (const [k, v] of Object.entries(event.detail)) {
+        safe[redactSecrets(k)] = typeof v === "string" ? redactSecrets(v) : v;
+      }
+      event.detail = safe;
+    }
+    return event;
+  }
+  function assembleDebugBundle(input) {
+    const { events } = input;
+    let interceptCount = 0;
+    let errorCount = 0;
+    let lastInterceptAt = null;
+    for (const e of events) {
+      if (e.stage === "intercept") {
+        interceptCount += 1;
+        lastInterceptAt = e.ts;
+      }
+      if (e.level === "error") errorCount += 1;
+    }
+    const bundle = {
+      schema: "kops-filter-exporter-debug",
+      bundle_version: 1,
+      export_id: input.exportId,
+      generated_at: input.generatedAt,
+      extension: { version: input.extensionVersion },
+      environment: input.environment,
+      summary: {
+        eventCount: events.length,
+        interceptCount,
+        errorCount,
+        lastInterceptAt,
+        lastCaptureAt: input.storage.lastUpdate,
+        storedFilterCount: input.storage.filterCount,
+        lastSource: input.storage.lastSource
+      },
+      storage: {
+        ...input.storage,
+        lastErrors: input.storage.lastErrors?.map(redactSecrets) ?? null
+      },
+      events,
+      notes: [
+        "summary{} and storage{} are authoritative \u2014 read directly in the service worker.",
+        "events[] is best-effort (page \u2192 content script \u2192 service worker). An EMPTY list means no diagnostics were observed \u2014 most likely the inject script never ran or the endpoint never matched.",
+        'An "intercept" or "parse_fail" event proves the inject script ran and matched the endpoint; "parse_fail" carries the response shape (keys+types, no values).',
+        "URLs are reduced to origin+path; tokens and search terms are stripped. Filter contents are excluded unless the user explicitly opted in."
+      ]
+    };
+    if (input.filters) bundle.filters = input.filters;
+    return bundle;
   }
 
   // src/background.ts
@@ -4385,6 +4484,54 @@
       });
     });
   }
+  var DEBUG_LOG_KEY = "debugLog";
+  var debugBuffer = [];
+  var hydration = null;
+  var writing = false;
+  var writeDirty = false;
+  function hydrateDebugBuffer() {
+    if (!hydration) {
+      hydration = new Promise((resolve) => {
+        chrome.storage.local.get(DEBUG_LOG_KEY, (result) => {
+          void chrome.runtime.lastError;
+          const stored = result?.[DEBUG_LOG_KEY];
+          if (Array.isArray(stored)) debugBuffer = stored;
+          resolve();
+        });
+      });
+    }
+    return hydration;
+  }
+  function persistDebugBuffer() {
+    if (writing) {
+      writeDirty = true;
+      return;
+    }
+    writing = true;
+    chrome.storage.local.set({ [DEBUG_LOG_KEY]: debugBuffer }, () => {
+      void chrome.runtime.lastError;
+      writing = false;
+      if (writeDirty) {
+        writeDirty = false;
+        persistDebugBuffer();
+      }
+    });
+  }
+  async function recordEvent(input) {
+    try {
+      await hydrateDebugBuffer();
+      debugBuffer = pushEvent(debugBuffer, toEvent(input, "background"));
+      persistDebugBuffer();
+    } catch {
+    }
+  }
+  function makeExportId() {
+    try {
+      return crypto.randomUUID();
+    } catch {
+      return `exp-${Math.round(performance.now())}`;
+    }
+  }
   function canonicalSource(source) {
     return source === "vtoolsv2" ? "vtools" : "souk";
   }
@@ -4400,11 +4547,35 @@
     } else {
       return { ok: false, count: 0, errors: [`Unknown source: ${source}`] };
     }
-    const { filters, errors } = result;
+    const { filters, errors, expectedTotal } = result;
     const canonical = canonicalSource(wire);
+    void recordEvent({
+      stage: "normalize",
+      source: wire,
+      count: filters.length,
+      detail: { errorCount: errors.length, expectedTotal: expectedTotal ?? null }
+    });
     if (filters.length === 0) {
       console.warn(LOG_PREFIX, `No valid filters parsed from ${source}`, errors);
+      void recordEvent({ stage: "capture_empty", source: wire, detail: { errorCount: errors.length } });
       return { ok: false, count: 0, errors };
+    }
+    if (expectedTotal != null && filters.length < expectedTotal) {
+      const prior = await readState();
+      if (prior.lastSource === canonical && prior.filters.length > filters.length) {
+        console.warn(
+          LOG_PREFIX,
+          `Incomplete ${canonical} capture (${filters.length}/${expectedTotal}) \u2014 kept ${prior.filters.length} previously stored`
+        );
+        void recordEvent({
+          stage: "note",
+          source: wire,
+          count: filters.length,
+          message: `kept ${prior.filters.length} stored over incomplete ${filters.length}/${expectedTotal}`,
+          detail: { stored: prior.filters.length, captured: filters.length, expectedTotal }
+        });
+        return { ok: true, count: prior.filters.length, errors };
+      }
     }
     try {
       await saveToStorage({
@@ -4416,8 +4587,10 @@
     } catch (storageErr) {
       const msg = `Storage save failed: ${storageErr.message}`;
       console.error(LOG_PREFIX, msg);
+      void recordEvent({ stage: "store_fail", source: wire, message: msg });
       return { ok: false, count: 0, errors: [...errors, msg] };
     }
+    void recordEvent({ stage: "store_ok", source: wire, count: filters.length });
     try {
       chrome.action.setBadgeText({ text: String(filters.length) });
       chrome.action.setBadgeBackgroundColor({ color: "#8b5cf6" });
@@ -4503,6 +4676,49 @@
             chrome.action.setBadgeText({ text: "" });
             sendResponse({ ok: true });
           }).catch((err) => sendResponse({ ok: false, error: err.message }));
+          return true;
+        }
+        case DIAG_ACTION: {
+          if (message.event && typeof message.event === "object") {
+            void recordEvent(message.event);
+          }
+          return false;
+        }
+        case EXPORT_DEBUG_ACTION: {
+          const includeFilters = message.includeFilters === true;
+          const environment = {
+            userAgent: typeof message.environment?.userAgent === "string" ? message.environment.userAgent : "",
+            language: typeof message.environment?.language === "string" ? message.environment.language : ""
+          };
+          (async () => {
+            await hydrateDebugBuffer();
+            const state = await readState();
+            const generatedAt = (/* @__PURE__ */ new Date()).toISOString();
+            const bundle = assembleDebugBundle({
+              exportId: makeExportId(),
+              generatedAt,
+              extensionVersion: chrome.runtime.getManifest().version,
+              environment,
+              storage: {
+                filterCount: state.filters.length,
+                lastSource: state.lastSource,
+                lastUpdate: state.lastUpdate,
+                lastErrors: state.lastErrors
+              },
+              events: debugBuffer,
+              filters: includeFilters ? state.filters : void 0
+            });
+            void recordEvent({
+              stage: "export",
+              message: `exported ${bundle.events.length} events (filters ${includeFilters ? "included" : "excluded"})`
+            });
+            return {
+              ok: true,
+              json: JSON.stringify(bundle, null, 2),
+              filename: `kops-debug-${generatedAt.slice(0, 10)}.json`,
+              summary: bundle.summary
+            };
+          })().then(sendResponse).catch((err) => sendResponse({ ok: false, error: err.message }));
           return true;
         }
         default:

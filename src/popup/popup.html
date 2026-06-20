@@ -131,6 +131,20 @@
     <!-- Footer -->
     <footer class="footer">
       <span id="lastUpdate"></span>
+      <div class="footer-debug">
+        <label class="debug-include" title="Includes your captured filter data in the bundle (your own data)">
+          <input type="checkbox" id="debugIncludeFilters">
+          <span>Include filter data</span>
+        </label>
+        <button type="button" class="debug-btn" id="debugExportBtn"
+          title="Export a diagnostic bundle (no tokens, no search terms) to send to support">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M9 4.5L7.5 2M15 4.5L16.5 2M12 8a4 4 0 014 4v3a4 4 0 01-8 0v-3a4 4 0 014-4zM12 8v12M5 12H3m18 0h-2M5.5 8L4 6.5m14.5 1.5L20 6.5M5.5 17L4 18.5m14.5-1.5L20 18.5"
+              stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Export debug session
+        </button>
+      </div>
     </footer>
   </div>
 

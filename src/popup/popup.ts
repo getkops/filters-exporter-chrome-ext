@@ -44,6 +44,8 @@ import {
   const refreshDropdown = $('refreshDropdown');
   const refreshBtn = $('refreshBtn');
   const refreshMenu = $('refreshMenu');
+  const debugExportBtn = $('debugExportBtn') as HTMLButtonElement;
+  const debugIncludeFilters = $('debugIncludeFilters') as HTMLInputElement;
 
   // ─── State ────────────────────────────────────────────────────
 
@@ -71,6 +73,13 @@ import {
     error?: string;
     json?: string;
     count?: number;
+  }
+
+  interface DebugResponse {
+    ok?: boolean;
+    error?: string;
+    json?: string;
+    filename?: string;
   }
 
   // ─── Communication ────────────────────────────────────────────
@@ -485,6 +494,39 @@ import {
       console.error(LOG_PREFIX, 'Clear failed:', err);
       showToast('Clear failed — try again', 'error');
       clearBtn.disabled = false;
+    }
+  });
+
+  // ─── Debug session export ───────────────────────────────────────
+  // Always enabled — the most important case to debug is "nothing captured".
+
+  debugExportBtn.addEventListener('click', async () => {
+    debugExportBtn.disabled = true;
+    try {
+      const response = await sendMessage<DebugResponse>({
+        action: 'EXPORT_DEBUG',
+        includeFilters: debugIncludeFilters.checked,
+        environment: { userAgent: navigator.userAgent, language: navigator.language },
+      });
+      if (!response.ok || !response.json) {
+        showToast(response.error || 'Debug export failed', 'error');
+        return;
+      }
+      const filename = response.filename || `kops-debug-${new Date().toISOString().slice(0, 10)}.json`;
+      downloadJSON(response.json, filename);
+      let copied = false;
+      try {
+        await navigator.clipboard.writeText(response.json);
+        copied = true;
+      } catch {
+        /* clipboard is best-effort — the download already succeeded */
+      }
+      showToast(copied ? 'Debug session saved + copied' : 'Debug session saved', 'success');
+    } catch (err) {
+      console.error(LOG_PREFIX, 'Debug export failed:', err);
+      showToast('Debug export failed — try again', 'error');
+    } finally {
+      debugExportBtn.disabled = false;
     }
   });
 

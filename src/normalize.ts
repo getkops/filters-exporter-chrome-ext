@@ -177,6 +177,12 @@ export const VTOOLSV2_REGIONS: Record<string, string> = {
 export interface NormalizeResult {
   filters: ExportedFilter[];
   errors: string[];
+  /**
+   * The source's reported grand total (V-Tools `total_entries`), or null when
+   * the source reports none (Souk). Lets the service worker tell a COMPLETE
+   * capture from a SHORT one and avoid regressing a larger stored set.
+   */
+  expectedTotal?: number | null;
 }
 
 // ─── Souk.to normalizer ────────────────────────────────────────────
@@ -409,10 +415,13 @@ export function normalizeVToolsV2Response(response: unknown): NormalizeResult {
     errors.push(`V-Tools V2 API returned success: ${String(r.success ?? 'undefined')}`);
   }
   const data = r.data as Record<string, unknown> | undefined;
+  const pagination = data?.pagination as Record<string, unknown> | undefined;
+  const expectedTotal =
+    typeof pagination?.total_entries === 'number' ? pagination.total_entries : null;
   const list = data?.list;
   if (!Array.isArray(list)) {
     errors.push('V-Tools V2 response.data.list is not an array');
-    return { filters: [], errors };
+    return { filters: [], errors, expectedTotal };
   }
 
   const filters: ExportedFilter[] = [];
@@ -421,5 +430,5 @@ export function normalizeVToolsV2Response(response: unknown): NormalizeResult {
     if (normalized) filters.push(normalized);
     else errors.push(`V-Tools V2 filter at index ${index} skipped (invalid or unnamed)`);
   });
-  return { filters, errors };
+  return { filters, errors, expectedTotal };
 }

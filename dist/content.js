@@ -1,5 +1,9 @@
 "use strict";
 (() => {
+  // src/diagnostics.ts
+  var DIAG_MSG_TYPE = "__FILTER_EXPORTER_DIAG__";
+  var DIAG_ACTION = "DIAG_EVENT";
+
   // src/content.ts
   (function() {
     "use strict";
@@ -12,7 +16,15 @@
       }
       if (event.source !== window) return;
       const msg = event.data;
-      if (!msg || msg.type !== MSG_TYPE) return;
+      if (!msg || typeof msg.type !== "string") return;
+      if (msg.type === DIAG_MSG_TYPE) {
+        try {
+          chrome.runtime.sendMessage({ action: DIAG_ACTION, event: msg.event });
+        } catch {
+        }
+        return;
+      }
+      if (msg.type !== MSG_TYPE) return;
       if (!msg.source || typeof msg.source !== "string") {
         console.warn(LOG_PREFIX, "Invalid message: missing source");
         return;

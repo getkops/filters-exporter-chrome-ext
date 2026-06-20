@@ -270,3 +270,17 @@ describe('V-Tools V2 response envelope', () => {
     expect(normalizeVToolsV2Response(42).errors[0]).toMatch(/not an object/);
   });
 });
+
+describe('normalizeVToolsV2Response — expectedTotal (drives the anti-regression guard)', () => {
+  const filter = { name: 'A', enabled: true, components: [] };
+
+  it('surfaces the reported total_entries', () => {
+    const resp = { success: true, data: { list: [filter], pagination: { total_entries: 444, per_page: 20 } } };
+    expect(normalizeVToolsV2Response(resp).expectedTotal).toBe(444);
+  });
+
+  it('is null when pagination/total is absent', () => {
+    const resp = { success: true, data: { list: [filter] } };
+    expect(normalizeVToolsV2Response(resp).expectedTotal).toBeNull();
+  });
+});
