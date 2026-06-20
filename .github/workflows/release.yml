@@ -15,6 +15,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
       - name: Read version from manifest
         id: version
         run: |
@@ -24,12 +39,11 @@ jobs:
       - name: Build zip
         run: |
           zip -r kops-filter-exporter-v${{ steps.version.outputs.version }}.zip \
+            dist/ \
             manifest.json \
-            LICENSE \
             icons/ \
-            src/ \
-            logo_rounded.png \
-            -x "*.git*" "example_*"
+            LICENSE \
+            -x "*.git*"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

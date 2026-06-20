@@ -5,7 +5,7 @@
 <h1 align="center">Kops Filter Exporter</h1>
 
 <p align="center">
-  <strong>Chrome extension to extract filters from V-Tools & Souk.to and export them as CSV</strong>
+  <strong>Chrome extension (MV3) that extracts filters from V-Tools &amp; Souk.to and exports them as a typed JSON envelope for import into Kops</strong>
   <br />
   <em>Open-source tool by <a href="https://getkops.com">Kops</a> — the fastest Vinted items monitor on the market</em>
 </p>
@@ -15,6 +15,7 @@
     <img src="https://img.shields.io/chrome-web-store/v/mbdpmogocbigcjghpdlcckplhjnbhand?label=chrome%20web%20store&logo=googlechrome&logoColor=white&color=4285F4" alt="Chrome Web Store" />
   </a>
   <img src="https://img.shields.io/badge/manifest-v3-brightgreen" alt="Manifest V3" />
+  <img src="https://img.shields.io/badge/built%20with-TypeScript-3178C6?logo=typescript&logoColor=white" alt="TypeScript" />
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License" />
 </p>
 
@@ -22,100 +23,172 @@
 
 ## What it does
 
-Kops Filter Exporter silently intercepts the filters/alerts API responses when you visit V-Tools or Souk.to dashboards, normalizes them into a universal format, and lets you download everything as a clean CSV file.
+Kops Filter Exporter silently intercepts the filters/alerts API responses when you visit V-Tools or Souk.to dashboards, normalizes them into a **typed, versioned JSON envelope**, and lets you download everything as a single `.json` file ready to import into [Kops](https://getkops.com).
 
-### Supported services
+> **v2.0.0** replaced the old lossy CSV export with a typed JSON envelope. CSV could not represent keyword groups (AND/OR logic); the JSON contract can. Legacy **V-Tools V1** is no longer supported.
 
-| Service     | Dashboard URL                       | Intercepted API                          |
-| ----------- | ----------------------------------- | ---------------------------------------- |
-| **V-Tools** | `app.v-tools.com/dashboard/filtres` | `custom.v-tools.com/v3/services/filters` |
-| **Souk.to** | `souk.to/{lang}/app/alerts`         | `api.souk.to/api/v1/matching_alert/web`  |
+### Supported sources
 
-> Souk.to language prefixes (`/en/`, `/fr/`, etc.) are handled automatically.
+| Source      | Dashboard URL                            | Intercepted API                          |
+| ----------- | ---------------------------------------- | ---------------------------------------- |
+| **V-Tools** | `dashboard.v-tools.com/dashboard/filters`| `www.v-tools.com/api/vinted/filters/list`|
+| **Souk.to** | `souk.to/{lang}/app/alerts`              | `api.souk.to/api/v1/matching_alert/web`  |
+
+> Souk.to language prefixes (`/en/`, `/fr/`, etc.) and multi-page results are handled automatically — the extension replays your authenticated request to fetch every page.
+
+## The JSON export format
+
+The export is a typed envelope whose schema is the **single source of truth**, generated from the Kops Go DTOs (ADR-040) and vendored into this repo at `src/generated/filter-export-schema.generated.ts`.
+
+```jsonc
+{
+  "schema_version": 1,                 // bumped on breaking changes; Kops rejects mismatches
+  "source": "vtools",                  // "vtools" | "souk"
+  "exported_at": "2026-06-20T10:00:00.000Z",
+  "filters": [
+    {
+      "name": "Example phone deals",
+      "enabled": true,
+      "autocop": false,
+      "price_min": 2,                  // omitted when 0/absent
+      "price_max": 20,
+      "catalog_ids": [3661],
+      "brand_ids": [1001],
+      "brand_names": ["Sample Brand"],
+      "size_ids": [], "size_names": [],
+      "status_ids": [3],
+      "color_ids": [1], "color_names": ["Black"],
+      "material_ids": [], "material_names": [],
+      "country_ids": [16, 19],
+      "region_isos": [],               // V-Tools regions resolved to ISO codes
+      "video_game_platform_ids": [],
+      "video_game_rating_ids": [],
+      "isbn_list": [],
+      "keyword_rules": {               // groups are AND'd; keywords within a group are OR'd
+        "groups": [
+          { "keywords": ["alpha", "bravo"] },
+          { "keywords": ["charlie", "delta"] }
+        ]
+      },
+      "blacklist_keywords": ["echo"]
+    }
+  ]
+}
+```
+
+- **Keyword logic is preserved**: `keyword_rules.groups` are AND'd together; the `keywords` inside each group are OR'd. `blacklist_keywords` are negative terms.
+- Every list field is always present (`[]` when empty). `keyword_rules` is `null` when a filter has no include keywords.
+- Filename: `kops-filters-v{schema_version}-{YYYY-MM-DD}.json`.
 
 ## Installation
 
 ### Option A — Chrome Web Store (recommended)
-
-<p align="center">
-  <a href="https://chromewebstore.google.com/detail/kops-filter-exporter/mbdpmogocbigcjghpdlcckplhjnbhand">
-    <img src="https://img.shields.io/badge/install-Chrome%20Web%20Store-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Available in the Chrome Web Store" />
-  </a>
-</p>
 
 Install directly from the [**Chrome Web Store**](https://chromewebstore.google.com/detail/kops-filter-exporter/mbdpmogocbigcjghpdlcckplhjnbhand) — one click, automatic updates.
 
 ### Option B — Download the latest release
 
 1. Go to the [**Releases page**](https://github.com/getkops/filters-exporter-chrome-ext/releases/latest)
-2. Download the `kops-filter-exporter-v*.zip` file
-3. Unzip the archive
-4. Open `chrome://extensions` in Chrome → enable **Developer mode** (top-right toggle)
-5. Click **Load unpacked** → select the unzipped folder
+2. Download the `kops-filter-exporter-v*.zip` and unzip it
+3. Open `chrome://extensions` → enable **Developer mode** (top-right toggle)
+4. Click **Load unpacked** → select the unzipped folder
 
-### Option C — Clone the repository
+### Option C — Build from source
+
+This extension is written in TypeScript and bundled with esbuild, so it must be built before loading.
 
 ```bash
-git clone https://github.com/getkops/filters-exporter-chrome-ext.git
+pnpm install
+pnpm build        # bundles src/ → dist/
 ```
 
-1. Open `chrome://extensions` in Chrome → enable **Developer mode**
-2. Click **Load unpacked** → select the cloned `filters-exporter-chrome-ext` folder
+Then in Chrome:
+
+1. Open `chrome://extensions` → enable **Developer mode**
+2. Click **Load unpacked** → select the repository root (Chrome reads `manifest.json`, which points at `dist/`)
 
 ## Usage
 
-1. Navigate to a supported filter page (V-Tools or Souk.to)
+1. Navigate to a supported filter page (V-Tools or Souk.to), or use the **Refresh** dropdown in the popup to open one
 2. The extension badge shows the number of captured filters
-3. Click the extension icon to see the filter list
-4. Click **Export CSV** to download
+3. Click the extension icon to see and search the filter list (select rows to export a subset)
+4. Click **Export JSON** to download the envelope, then import it into Kops
 
-## CSV format
+## Development
 
+| Command              | What it does                                              |
+| -------------------- | -------------------------------------------------------- |
+| `pnpm build`         | Bundle `src/*.ts` → `dist/` (IIFE files Chrome loads)    |
+| `pnpm typecheck`     | `tsc --noEmit` strict type-check                          |
+| `pnpm test`          | Run the vitest suite against the fixture exports          |
+| `pnpm anonymize`     | Scrub a raw V-Tools/Souk capture into a safe fixture      |
+| `pnpm verify:schema` | Fail if the vendored schema drifts from the Kops SSOT     |
+| `pnpm sync:schema`   | Copy the freshly generated schema from the Kops repo      |
+
+### Schema sync gate
+
+The JSON contract is generated from the Go DTOs in the Kops monorepo and vendored here. After changing the Go DTOs, maintainers re-sync the vendored copy:
+
+```bash
+KOPS_REPO=/path/to/kops-dashboard pnpm sync:schema
 ```
-source,name,search_text,price_from,price_to,catalogs,catalog_ids,brands,brand_ids,sizes,size_ids,statuses,status_ids,colors,color_ids,materials,material_ids,countries,country_ids,enabled
-```
 
-- Each name column (e.g. `brands`) is paired with an `_ids` column (e.g. `brand_ids`) containing the Vinted IDs — ready for programmatic import into [Kops](https://getkops.com)
-- Multi-value fields are separated with `|`
-- UTF-8 BOM included for Excel compatibility
-- Filename includes source and date: `v_tools_filters_2026-02-12.csv`
+CI runs `pnpm verify:schema`, which diffs the vendored file against
+`$KOPS_REPO/api/gen/extension/filter-export-schema.generated.ts` **only when `KOPS_REPO` is set** (otherwise it is a no-op, since the vendored file is the source of truth in environments without the monorepo). **Do not hand-edit** `src/generated/filter-export-schema.generated.ts`.
+
+### Test fixtures & anonymization
+
+The committed `fixtures/*.json` are **fully synthetic** — no real account data — and split the parser scenarios into named files (`souk-keyword-groups`, `souk-legacy-search-text`, `vtools-keyword-operators`, `vtools-facets`).
+
+Real captures (`example_*.json`) are **gitignored**. To turn one into a safe fixture, run the anonymizer: it deterministically strips every account identifier (`user_id`, `client_id`, alert/filter IDs, timestamps), replaces names and keyword terms with synthetic tokens, and genericizes brand/model titles, while preserving structure so the output still exercises every parser path:
+
+```bash
+pnpm anonymize example_souk.json --out fixtures/my-scenario.json
+```
 
 ## How it works
 
-The extension uses a **fetch/XHR monkey-patching** technique via content scripts — no `chrome.debugger` needed, so there's no yellow debugging banner.
+The extension uses a **fetch/XHR monkey-patching** technique via content scripts — no `chrome.debugger`, so there's no yellow debugging banner.
 
 ```
-inject.js (page context) → content.js (content script) → background.js (service worker) → popup.js
+inject.ts (page MAIN world) → content.ts (content script) → background.ts (service worker) → popup.ts
 ```
 
-1. `inject.js` patches `window.fetch` and `XMLHttpRequest` to capture matching API responses
-2. `content.js` bridges the page context to the extension via `window.postMessage`
-3. `background.js` parses and normalizes the data, stores it in `chrome.storage.local`
-4. `popup.js` displays the filters and handles CSV export
+1. `inject.ts` patches `window.fetch` and `XMLHttpRequest` to capture matching API responses (and paginate them)
+2. `content.ts` bridges the page context to the extension via `window.postMessage`
+3. `background.ts` normalizes the data into `ExportedFilter[]`, stores it in `chrome.storage.local`, and builds the validated JSON envelope
+4. `popup.ts` displays the filters and triggers the JSON download
 
 ## Project structure
 
 ```
-├── manifest.json           # Manifest V3 configuration
+├── manifest.json                # Manifest V3 (points at dist/)
+├── build.mjs                    # esbuild bundler
+├── tsconfig.json                # strict TypeScript config
+├── vitest.config.ts             # node-env test config
+├── scripts/
+│   ├── sync-schema.mjs          # cross-repo schema sync / drift gate
+│   └── anonymize-export.mjs     # scrub a raw capture into a safe fixture
+├── fixtures/                    # committed SYNTHETIC example exports (tests)
 ├── src/
-│   ├── inject.js           # Fetch/XHR interception (page context)
-│   ├── content.js          # Message bridge (content script)
-│   ├── background.js       # Service worker, parsers, storage
-│   ├── export.js           # CSV generation utilities
-│   ├── parsers/
-│   │   ├── vtools.js       # V-Tools response normalizer
-│   │   └── souk.js         # Souk.to response normalizer
+│   ├── inject.ts                # fetch/XHR interception + pagination (page context)
+│   ├── content.ts               # message bridge (content script)
+│   ├── background.ts            # service worker, storage, JSON export
+│   ├── normalize.ts             # pure V-Tools/Souk normalizers + region table
+│   ├── parsers.test.ts          # vitest suite (runs against fixtures)
+│   ├── generated/
+│   │   └── filter-export-schema.generated.ts   # vendored SSOT — DO NOT EDIT
 │   └── popup/
-│       ├── popup.html      # Popup UI
-│       ├── popup.js        # Popup logic
-│       └── popup.css       # Dark-mode styles (raw CSS)
-├── icons/                  # Extension icons (16/48/128px)
-└── logo_rounded.png        # Source logo
+│       ├── popup.html           # popup UI
+│       ├── popup.ts             # popup logic
+│       └── popup.css            # dark-mode styles (raw CSS)
+├── dist/                        # build output (loaded by Chrome)
+└── icons/                       # extension icons (16/48/128px)
 ```
 
 ## Contributing
 
-Contributions are welcome! Feel free to open issues or submit pull requests.
+Contributions are welcome! Feel free to open issues or submit pull requests. Run `pnpm typecheck && pnpm build && pnpm test` before pushing.
 
 ## License
 

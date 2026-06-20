@@ -1,0 +1,57 @@
+{
+  "success": true,
+  "data": {
+    "list": [
+      {
+        "alert": false,
+        "boosted": false,
+        "client_id": "clt_example",
+        "components": [
+          {
+            "operator": "contains",
+            "type": "keyword",
+            "value": ["alpha"]
+          },
+          {
+            "operator": "contains",
+            "type": "keyword",
+            "value": ["bravo", "charlie"]
+          },
+          {
+            "operator": "strict_contains",
+            "type": "keyword",
+            "value": ["delta"]
+          },
+          {
+            "operator": "ncontains",
+            "type": "keyword",
+            "value": ["echo"]
+          },
+          {
+            "operator": "strict_ncontains",
+            "type": "keyword",
+            "value": ["foxtrot"]
+          },
+          {
+            "operator": "contains",
+            "type": "region",
+            "value": ["reg_IezcaEzJsV7i80r1tt4EK", "reg_unknown_future"]
+          },
+          {
+            "operator": "between",
+            "type": "price",
+            "value": { "max": 0, "min": 0, "unit": "eur" }
+          }
+        ],
+        "created_at": 1577836800,
+        "enabled": true,
+        "filter_id": "flt_example1",
+        "label_ids": [],
+        "labels": [],
+        "name": "Example operators filter",
+        "updated_at": 1577836800
+      }
+    ],
+    "pagination": { "per_page": 20, "total_entries": 1, "total_pages": 1 }
+  }
+}

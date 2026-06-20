@@ -1,0 +1,66 @@
+{
+  "type": "success",
+  "body": {
+    "alerts": [
+      {
+        "id": "example-souk-1",
+        "name": "Example phone alert",
+        "mode": "push",
+        "frequency": "instant",
+        "keywords_version": 2,
+        "keyword_groups_v2": [
+          ["alpha", "bravo"],
+          ["charlie", "delta"]
+        ],
+        "negative_keywords_v2": ["echo"],
+        "currency_code": "EUR",
+        "price_from": 2,
+        "price_to": 20,
+        "price_from_eur": 2,
+        "price_to_eur": 20,
+        "exclude_business_sellers": false,
+        "exclude_emojis": false,
+        "exclude_hashtags": false,
+        "countries": [
+          { "id": 16, "title": "France" },
+          { "id": 2, "title": "Germany" }
+        ],
+        "catalogs": [{ "id": 3661, "title": "Mobile phones" }],
+        "brands": [{ "id": 1001, "title": "Sample Brand" }],
+        "models": [{ "id": 2002, "title": "Sample Model" }],
+        "colors": [{ "id": 1, "title": "Black" }],
+        "materials": [{ "id": 45, "title": "Polyester" }],
+        "status": [{ "id": 3, "title": "Good" }],
+        "created_at": "2020-01-01T00:00:00Z",
+        "updated_at": "2020-01-01T00:00:00Z",
+        "is_deactivated": false,
+        "folder_id": "default",
+        "user_id": 0
+      },
+      {
+        "id": "example-souk-2",
+        "name": "Example no-keyword alert",
+        "mode": "push",
+        "frequency": "instant",
+        "keywords_version": 2,
+        "currency_code": "EUR",
+        "price_from": 0,
+        "price_to": 0,
+        "exclude_business_sellers": false,
+        "exclude_emojis": false,
+        "exclude_hashtags": false,
+        "countries": [{ "id": 16, "title": "France" }],
+        "catalogs": [{ "id": 2940, "title": "Beach bags" }],
+        "materials": [
+          { "id": 44, "title": "Cotton" },
+          { "id": 45, "title": "Polyester" }
+        ],
+        "created_at": "2020-01-01T00:00:00Z",
+        "updated_at": "2020-01-01T00:00:00Z",
+        "is_deactivated": false,
+        "folder_id": "default",
+        "user_id": 0
+      }
+    ]
+  }
+}

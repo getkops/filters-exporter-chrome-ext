@@ -1,0 +1,135 @@
+{
+  "success": true,
+  "data": {
+    "list": [
+      {
+        "alert": false,
+        "boosted": true,
+        "client_id": "clt_example",
+        "components": [
+          {
+            "operator": "contains",
+            "type": "catalog",
+            "value": [{ "title": "Shoes", "value": 1231 }]
+          },
+          {
+            "operator": "contains",
+            "type": "color",
+            "value": [
+              { "title": "Grey", "value": 3 },
+              { "title": "White", "value": 12 }
+            ]
+          },
+          {
+            "operator": "contains",
+            "type": "brand",
+            "value": [
+              { "title": "Sample Brand A", "value": 12 },
+              { "title": "Sample Brand B", "value": 7 }
+            ]
+          },
+          {
+            "operator": "contains",
+            "type": "status",
+            "value": [
+              { "title": "New with tags", "value": 1 },
+              { "title": "Very good", "value": 2 }
+            ]
+          },
+          {
+            "operator": "contains",
+            "type": "material",
+            "value": [{ "title": "Cotton", "value": 44 }]
+          },
+          {
+            "operator": "between",
+            "type": "price",
+            "value": { "max": 100, "min": 12, "unit": "eur" }
+          },
+          {
+            "operator": "strict_contains",
+            "type": "keyword",
+            "value": ["alpha"]
+          }
+        ],
+        "created_at": 1577836800,
+        "enabled": true,
+        "filter_id": "flt_example1",
+        "label_ids": [],
+        "labels": [],
+        "name": "Example rich filter",
+        "updated_at": 1577836800
+      },
+      {
+        "alert": false,
+        "boosted": false,
+        "client_id": "clt_example",
+        "components": [
+          {
+            "operator": "contains",
+            "type": "catalog",
+            "value": [{ "title": "Games", "value": 3026 }]
+          },
+          {
+            "operator": "contains",
+            "type": "video_game_platform",
+            "value": [
+              { "title": "Platform A", "value": 1261 },
+              { "title": "Platform B", "value": 1262 }
+            ]
+          },
+          {
+            "operator": "contains",
+            "type": "video_game_rating",
+            "value": [
+              { "title": "E10+", "value": 171 },
+              { "title": "E", "value": 170 }
+            ]
+          },
+          {
+            "operator": "between",
+            "type": "price",
+            "value": { "max": 30, "min": 2, "unit": "eur" }
+          }
+        ],
+        "created_at": 1577836800,
+        "enabled": true,
+        "filter_id": "flt_example2",
+        "label_ids": [],
+        "labels": [],
+        "name": "Example games filter",
+        "updated_at": 1577836800
+      },
+      {
+        "alert": false,
+        "boosted": false,
+        "client_id": "clt_example",
+        "components": [
+          {
+            "operator": "contains",
+            "type": "catalog",
+            "value": [{ "title": "Shoes", "value": 1231 }]
+          },
+          {
+            "operator": "between",
+            "type": "price",
+            "value": { "max": 0, "min": 0, "unit": "eur" }
+          },
+          {
+            "operator": "strict_contains",
+            "type": "keyword",
+            "value": ["bravo"]
+          }
+        ],
+        "created_at": 1577836800,
+        "enabled": false,
+        "filter_id": "flt_example3",
+        "label_ids": [],
+        "labels": [],
+        "name": "Example zero-price filter",
+        "updated_at": 1577836800
+      }
+    ],
+    "pagination": { "per_page": 20, "total_entries": 3, "total_pages": 1 }
+  }
+}

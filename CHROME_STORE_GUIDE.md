@@ -57,29 +57,29 @@ Kops Filter Exporter — V-Tools & Souk.to
 ### Short Description (132 chars max)
 
 ```
-Export your V-Tools & Souk.to filters as CSV with Vinted IDs. Migrate your alerts to Kops in seconds. Free & open-source by Kops.
+Export your V-Tools & Souk.to filters as typed JSON with Vinted IDs. Migrate your alerts to Kops in seconds. Free & open-source by Kops.
 ```
 
 ### Detailed Description
 
 ```
-Kops Filter Exporter is a free, open-source Chrome extension that captures your V-Tools and Souk.to filter configurations and exports them as a clean CSV file, complete with Vinted IDs for easy import.
+Kops Filter Exporter is a free, open-source Chrome extension that captures your V-Tools and Souk.to filter configurations and exports them as a typed JSON file, complete with Vinted IDs for easy import.
 
 🔥 KEY FEATURES
 
-• Automatic capture — Just visit your V-Tools or Souk.to filters page. The extension silently intercepts the API response. No clicks needed.
+• Automatic capture — Just visit your V-Tools or Souk.to filters page. The extension silently intercepts the API response (and paginates it for you). No clicks needed.
 
-• Universal CSV export — One format for both services. Includes filter names, search text, price ranges, catalogs, brands, sizes, statuses, colors, materials, countries, and enabled state.
+• Typed JSON export — One versioned format for both services. Includes filter names, keyword rules (AND/OR groups + blacklist), price ranges, catalogs, brands, sizes, statuses, colors, materials, countries/regions, ISBNs, and enabled/autocop state.
 
-• Vinted IDs included — Every field (brands, catalogs, sizes, etc.) includes the corresponding Vinted IDs alongside human-readable names, ready for programmatic import into Kops or any other tool.
+• Vinted IDs included — Every facet (brands, catalogs, sizes, etc.) carries the corresponding Vinted IDs alongside human-readable names, ready for programmatic import into Kops.
 
-• Excel-compatible — UTF-8 BOM encoding ensures proper display of special characters, emojis, and accented text in Microsoft Excel.
+• Lossless keyword logic — Unlike a flat CSV, the JSON envelope preserves grouped AND/OR keyword rules exactly as you configured them.
 
 • 100% private — All data stays on your local device. Nothing is ever sent to any server. Zero tracking, zero analytics.
 
 📦 SUPPORTED SERVICES
 
-• V-Tools — Intercepts filters from custom.v-tools.com
+• V-Tools — Intercepts filters from www.v-tools.com
 • Souk.to — Intercepts alerts from api.souk.to (all languages)
 
 🚀 HOW TO USE
@@ -87,8 +87,8 @@ Kops Filter Exporter is a free, open-source Chrome extension that captures your 
 1. Install the extension
 2. Navigate to your V-Tools or Souk.to filters page
 3. The extension badge shows the number of captured filters
-4. Click the extension icon → Export CSV
-5. Import the CSV into Kops (getkops.com) to recreate your filters instantly
+4. Click the extension icon → Export JSON
+5. Import the JSON into Kops (getkops.com) to recreate your filters instantly
 
 🔒 PRIVACY
 
@@ -122,7 +122,7 @@ English
 1. **Single purpose description:**
 
 ```
-This extension captures filter/alert configurations from V-Tools (v-tools.com) and Souk.to (souk.to) dashboards by intercepting their API responses, and exports them as CSV files for migration to other services.
+This extension captures filter/alert configurations from V-Tools (v-tools.com) and Souk.to (souk.to) dashboards by intercepting their API responses, and exports them as a typed JSON file for migration to other services.
 ```
 
 2. **Permission justifications:**
@@ -178,5 +178,5 @@ Add a `/privacy-filter-exporter` page on your website and paste the content of `
 
 ## After Publishing
 
-- Future updates: bump `version` in `manifest.json`, create a new tag (e.g. `v1.1.0`), download the new zip from Releases, and upload it in the Developer Dashboard
+- Future updates: bump `version` in `manifest.json`, create a new tag (e.g. `v2.1.0`), download the new zip from Releases, and upload it in the Developer Dashboard
 - The review for updates is usually faster (< 24h)

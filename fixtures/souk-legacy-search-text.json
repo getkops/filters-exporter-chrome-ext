@@ -1,0 +1,28 @@
+{
+  "type": "success",
+  "body": {
+    "alerts": [
+      {
+        "id": "example-souk-legacy-1",
+        "name": "Example legacy alert",
+        "mode": "push",
+        "frequency": "instant",
+        "keywords_version": 1,
+        "search_text": "alpha bravo -charlie -delta",
+        "currency_code": "EUR",
+        "price_from": 5,
+        "price_to": 50,
+        "price_from_eur": 5,
+        "price_to_eur": 50,
+        "exclude_business_sellers": false,
+        "countries": [{ "id": 16, "title": "France" }],
+        "catalogs": [{ "id": 1231, "title": "Shoes" }],
+        "created_at": "2020-01-01T00:00:00Z",
+        "updated_at": "2020-01-01T00:00:00Z",
+        "is_deactivated": false,
+        "folder_id": "default",
+        "user_id": 0
+      }
+    ]
+  }
+}

@@ -4,7 +4,7 @@
 
 ## Overview
 
-Kops Filter Exporter is a Chrome extension developed by [Kops](https://getkops.com) that extracts filter configurations from V-Tools and Souk.to dashboards and exports them as CSV files.
+Kops Filter Exporter is a Chrome extension developed by [Kops](https://getkops.com) that extracts filter configurations from V-Tools and Souk.to dashboards and exports them as a typed JSON file.
 
 ## Data Collection
 
@@ -35,12 +35,12 @@ The extension uses Chrome's built-in `chrome.storage.local` API to temporarily c
 
 The extension only activates on the following domains:
 
-- `app.v-tools.com`
+- `v-tools.com` (and subdomains)
 - `souk.to`
 
 ## Data Exported
 
-When you click "Export CSV", a file is generated **locally** in your browser and downloaded to your device. No data is uploaded or shared.
+When you click "Export JSON", a file is generated **locally** in your browser and downloaded to your device. No data is uploaded or shared.
 
 ## Third-Party Services
 
