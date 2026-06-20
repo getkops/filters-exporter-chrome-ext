@@ -145,8 +145,10 @@ describe('V-Tools V2 normalizer (keyword operators + regions)', () => {
   const { filters } = normalizeVToolsV2Response(loadFixture('vtools-keyword-operators.json'));
   const f = filters[0];
 
-  it('keeps one AND-group per include component (no merge) + OR within a component', () => {
-    expect(groupsOf(f)).toEqual([['alpha'], ['bravo', 'charlie'], ['delta']]);
+  it('maps contains→one OR-group and strict_contains→one AND-group per word (no merge)', () => {
+    // contains["alpha"] → [alpha]; contains["bravo","charlie"] → OR-group;
+    // strict_contains["delta","golf"] → two AND-groups (delta AND golf).
+    expect(groupsOf(f)).toEqual([['alpha'], ['bravo', 'charlie'], ['delta'], ['golf']]);
   });
 
   it('flattens ncontains + strict_ncontains into blacklist_keywords', () => {

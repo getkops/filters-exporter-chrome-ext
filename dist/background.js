@@ -4270,7 +4270,6 @@
     });
     return { filters, errors };
   }
-  var KW_INCLUDE_OPS = /* @__PURE__ */ new Set(["contains", "strict_contains"]);
   var KW_EXCLUDE_OPS = /* @__PURE__ */ new Set(["ncontains", "strict_ncontains"]);
   function normalizeVToolsV2Filter(filter) {
     if (!filter || typeof filter !== "object") return null;
@@ -4291,7 +4290,9 @@
       if (type === "keyword") {
         const op = typeof c.operator === "string" ? c.operator : "";
         const values = asArray(c.value).map((v) => String(v));
-        if (KW_INCLUDE_OPS.has(op)) {
+        if (op === "strict_contains") {
+          for (const v of values) includeGroups.push({ keywords: [v] });
+        } else if (op === "contains") {
           includeGroups.push({ keywords: values });
         } else if (KW_EXCLUDE_OPS.has(op)) {
           blacklist.push(...values);

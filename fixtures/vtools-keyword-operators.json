@@ -20,7 +20,7 @@
           {
             "operator": "strict_contains",
             "type": "keyword",
-            "value": ["delta"]
+            "value": ["delta", "golf"]
           },
           {
             "operator": "ncontains",

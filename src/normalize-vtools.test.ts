@@ -39,23 +39,40 @@ describe('V-Tools V2 keyword operators', () => {
     expect(groupsOf(withComponents(comp('contains', 'keyword', ['alpha'])))).toEqual([['alpha']]);
   });
 
-  it('strict_contains → an AND-group (Kops has no strict/fuzzy distinction)', () => {
+  it('strict_contains with one value → a single AND-group', () => {
     expect(groupsOf(withComponents(comp('strict_contains', 'keyword', ['alpha'])))).toEqual([['alpha']]);
   });
 
-  it('multiple include components → multiple groups, NEVER merged (the bug fix)', () => {
+  it('strict_contains with multiple values → one AND-group PER value (the fix)', () => {
+    // "strict" = every word must appear: (alpha AND bravo AND charlie),
+    // NOT a single OR-group (alpha OR bravo OR charlie).
+    expect(
+      groupsOf(withComponents(comp('strict_contains', 'keyword', ['alpha', 'bravo', 'charlie']))),
+    ).toEqual([['alpha'], ['bravo'], ['charlie']]);
+  });
+
+  it('contains with multiple values → a single OR-group', () => {
+    expect(groupsOf(withComponents(comp('contains', 'keyword', ['alpha', 'bravo'])))).toEqual([
+      ['alpha', 'bravo'],
+    ]);
+  });
+
+  it('mixes contains (OR-group) with strict_contains (AND-split), all AND-combined', () => {
+    const f = withComponents(
+      comp('contains', 'keyword', ['alpha', 'bravo']),
+      comp('strict_contains', 'keyword', ['charlie', 'delta']),
+    );
+    // (alpha OR bravo) AND (charlie) AND (delta)
+    expect(groupsOf(f)).toEqual([['alpha', 'bravo'], ['charlie'], ['delta']]);
+  });
+
+  it('multiple separate include components → multiple groups, NEVER merged', () => {
     const f = withComponents(
       comp('contains', 'keyword', ['alpha']),
       comp('contains', 'keyword', ['bravo']),
       comp('strict_contains', 'keyword', ['charlie']),
     );
     expect(groupsOf(f)).toEqual([['alpha'], ['bravo'], ['charlie']]);
-  });
-
-  it('multi-value component → OR within that single group', () => {
-    expect(groupsOf(withComponents(comp('contains', 'keyword', ['alpha', 'bravo'])))).toEqual([
-      ['alpha', 'bravo'],
-    ]);
   });
 
   it('ncontains and strict_ncontains both flatten into blacklist_keywords', () => {

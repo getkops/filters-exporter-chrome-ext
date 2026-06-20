@@ -299,7 +299,6 @@ export function normalizeSoukResponse(response: unknown): NormalizeResult {
 
 // ─── V-Tools V2 normalizer ─────────────────────────────────────────
 
-const KW_INCLUDE_OPS = new Set(['contains', 'strict_contains']);
 const KW_EXCLUDE_OPS = new Set(['ncontains', 'strict_ncontains']);
 
 interface V2Component {
@@ -314,12 +313,13 @@ interface V2Component {
  *
  * V2 uses a polymorphic `components[]` array of `{ operator, type, value }`.
  *
- * Keyword mapping (the bug fix):
- *  - Each include keyword component (operator `contains`/`strict_contains`)
- *    becomes ONE AND-group `{ keywords: component.value }`. Components are NOT
- *    merged — two `contains` components yield two separate groups.
- *  - `blacklist_keywords` = flat concat of every exclude keyword component's
- *    value (operator `ncontains`/`strict_ncontains`).
+ * Keyword mapping — the operator encodes the boolean logic, and components are
+ * always AND'd together (never merged):
+ *  - `strict_contains` = AND: each value becomes its OWN AND-group, so one
+ *    strict component with N words requires all N to appear.
+ *  - `contains` = OR: the component's values become a single OR-group.
+ *  - `blacklist_keywords` = flat concat of every exclude component's value
+ *    (`ncontains` / `strict_ncontains`); any blacklisted match rejects.
  *
  * Non-keyword facet components: first occurrence per `type` wins.
  */
@@ -350,10 +350,15 @@ export function normalizeVToolsV2Filter(filter: unknown): ExportedFilter | null 
     if (type === 'keyword') {
       const op = typeof c.operator === 'string' ? c.operator : '';
       const values = asArray<unknown>(c.value).map((v) => String(v));
-      if (KW_INCLUDE_OPS.has(op)) {
-        // One group per include component — do NOT merge.
+      if (op === 'strict_contains') {
+        // "strict" = AND: every word must appear → one AND-group per word.
+        for (const v of values) includeGroups.push({ keywords: [v] });
+      } else if (op === 'contains') {
+        // "contains" = OR: any word may match → a single OR-group. Components
+        // are never merged, so this group stays AND'd with the others.
         includeGroups.push({ keywords: values });
       } else if (KW_EXCLUDE_OPS.has(op)) {
+        // ncontains + strict_ncontains → flat blacklist (any match rejects).
         blacklist.push(...values);
       }
       continue;
