@@ -1,0 +1,10 @@
+{
+  "appName": {
+    "message": "Kops Filter Exporter",
+    "description": "Extension name shown in the toolbar, chrome://extensions and the Web Store."
+  },
+  "appDesc": {
+    "message": "Exportez les filtres V-Tools et Souk.to dans un JSON typé, prêt à importer dans Kops, le moniteur Vinted le plus rapide.",
+    "description": "Web Store / extension description."
+  }
+}

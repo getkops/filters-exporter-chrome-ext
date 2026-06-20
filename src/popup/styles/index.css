@@ -1,0 +1,5 @@
+/* Popup stylesheet entry — esbuild inlines these @imports into one popup.css.
+   Order matters: tokens first (custom properties), then base, then components. */
+@import './tokens.css';
+@import './base.css';
+@import './components.css';

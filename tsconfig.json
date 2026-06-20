@@ -17,8 +17,10 @@
     "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": false,
-    "noEmit": true
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact"
   },
-  "include": ["src/**/*.ts", "build.mjs", "scripts/**/*.ts", "scripts/**/*.mjs"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "build.mjs", "scripts/**/*.ts", "scripts/**/*.mjs"],
   "exclude": ["node_modules", "dist"]
 }

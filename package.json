@@ -1,6 +1,6 @@
 {
   "name": "kops-filter-exporter",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "description": "Chrome extension (MV3) that extracts filters from V-Tools and Souk.to and exports them as a typed JSON envelope for import into Kops.",
   "type": "module",
@@ -14,11 +14,17 @@
     "verify:schema": "node scripts/sync-schema.mjs --check"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/preact": "^3.2.4",
     "@types/chrome": "^0.0.270",
     "@types/node": "^22.10.0",
     "esbuild": "^0.24.0",
+    "happy-dom": "^20.10.6",
     "typescript": "^5.7.0",
     "vitest": "^2.1.0",
     "zod": "^3.24.0"
+  },
+  "dependencies": {
+    "preact": "^10.29.2"
   }
 }

@@ -5,7 +5,7 @@
 // popup's static assets (html + css) into dist/popup/.
 
 import { build } from 'esbuild';
-import { mkdir, copyFile, readFile, writeFile, rm } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -16,7 +16,7 @@ const ENTRIES = [
   { in: 'src/background.ts', out: 'dist/background.js' },
   { in: 'src/inject.ts', out: 'dist/inject.js' },
   { in: 'src/content.ts', out: 'dist/content.js' },
-  { in: 'src/popup/popup.ts', out: 'dist/popup/popup.js' },
+  { in: 'src/popup/main.tsx', out: 'dist/popup/popup.js' },
 ];
 
 async function run() {
@@ -37,6 +37,8 @@ async function run() {
       minify: false,
       legalComments: 'none',
       logLevel: 'info',
+      jsx: 'automatic',
+      jsxImportSource: 'preact',
     });
   }
 
@@ -46,10 +48,20 @@ async function run() {
 
   let html = await readFile(resolve(root, 'src/popup/popup.html'), 'utf8');
   // The bundle emits popup.js next to popup.html, so the src is already correct;
-  // normalize any "./popup.js" / "popup.ts" reference defensively.
-  html = html.replace(/src=["'](?:\.\/)?popup\.(?:ts|js)["']/g, 'src="popup.js"');
+  // normalize any "./main.tsx" / "popup.js" reference defensively.
+  html = html.replace(/src=["'](?:\.\/)?(?:popup|main)\.(?:tsx|ts|js)["']/g, 'src="popup.js"');
   await writeFile(resolve(popupOutDir, 'popup.html'), html);
-  await copyFile(resolve(root, 'src/popup/popup.css'), resolve(popupOutDir, 'popup.css'));
+
+  // Bundle the popup stylesheet as its own CSS entry: esbuild inlines the
+  // @import partials in styles/index.css into a single popup.css next to the
+  // html (the JS entries above don't import CSS, so it never enters popup.js).
+  await build({
+    entryPoints: [resolve(root, 'src/popup/styles/index.css')],
+    outfile: resolve(popupOutDir, 'popup.css'),
+    bundle: true,
+    minify: false,
+    logLevel: 'info',
+  });
 
   console.log('Build complete → dist/');
 }
