@@ -10,7 +10,12 @@ permissions:
 
 jobs:
   release:
-    runs-on: [self-hosted, Linux, X64]
+    # GitHub-hosted: this is a public repo (hosted minutes are free), the job is a
+    # rare tag-triggered extension build with no cluster/registry dependency, and
+    # `[self-hosted, Linux, X64]` matched nothing after the ARC migration (the
+    # gha-runner-scale-set runners only carry the label `getkops-runners`), so
+    # every release hung until GitHub's 24h auto-cancel. mise provides the toolchain.
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
