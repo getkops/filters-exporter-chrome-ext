@@ -4,6 +4,9 @@ example_*.csv
 store/*
 *.zip
 
+# Firefox (AMO) packaging staging dir — derived from dist/ by scripts/build-firefox.mjs.
+build/
+
 # Exported debug-session bundles (support artifacts — may contain user data).
 kops-debug-*.json
 

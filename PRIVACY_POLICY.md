@@ -1,10 +1,10 @@
 # Privacy Policy — Kops Filter Exporter
 
-**Last updated:** February 12, 2026
+**Last updated:** July 12, 2026
 
 ## Overview
 
-Kops Filter Exporter is a Chrome extension developed by [Kops](https://getkops.com) that extracts filter configurations from V-Tools and Souk.to dashboards and exports them as a typed JSON file.
+Kops Filter Exporter is a browser extension (Chrome and Firefox) developed by [Kops](https://getkops.com) that extracts filter configurations from V-Tools and Souk.to dashboards and exports them as a typed JSON file.
 
 ## Data Collection
 
@@ -19,7 +19,7 @@ The extension operates entirely on your local device. Specifically:
 
 ## Data Storage
 
-The extension uses Chrome's built-in `chrome.storage.local` API to temporarily cache intercepted filter data on your device. This data:
+The extension uses the browser's built-in `storage.local` API (`chrome.storage.local`) to temporarily cache intercepted filter data on your device. This data:
 
 - Stays entirely on your local machine
 - Is never transmitted anywhere

@@ -5,7 +5,7 @@
 <h1 align="center">Kops Filter Exporter</h1>
 
 <p align="center">
-  <strong>Chrome extension (MV3) that extracts filters from V-Tools &amp; Souk.to and exports them as a typed JSON envelope for import into Kops</strong>
+  <strong>Browser extension (MV3, Chrome &amp; Firefox) that extracts filters from V-Tools &amp; Souk.to and exports them as a typed JSON envelope for import into Kops</strong>
   <br />
   <em>Open-source tool by <a href="https://getkops.com">Kops</a> — the fastest Vinted items monitor on the market</em>
 </p>
@@ -112,6 +112,20 @@ Then in Chrome:
 1. Open `chrome://extensions` → enable **Developer mode**
 2. Click **Load unpacked** → select the repository root (Chrome reads `manifest.json`, which points at `dist/`)
 
+### Option D — Firefox (128+)
+
+The Firefox build is derived from the same source — it needs an event-page background and a Gecko add-on id, both generated automatically by `scripts/build-firefox.mjs` (the Chrome `manifest.json` is never edited).
+
+- **From a release:** download `kops-filter-exporter-firefox-v*.zip` from the [Releases page](https://github.com/getkops/filters-exporter-chrome-ext/releases/latest), open `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on** → select the zip.
+- **From source:**
+  ```bash
+  pnpm install
+  pnpm build:firefox     # builds dist/ then stages build/firefox/
+  pnpm run:firefox       # launches Firefox with the extension loaded
+  ```
+
+> Requires **Firefox 128+** — the MAIN-world content script the extension relies on landed in Firefox 128. See `FIREFOX_STORE_GUIDE.md` to publish on Firefox Add-ons (AMO).
+
 ## Usage
 
 1. Navigate to a supported filter page (V-Tools or Souk.to), or use the **Refresh** dropdown in the popup to open one
@@ -124,6 +138,9 @@ Then in Chrome:
 | Command              | What it does                                              |
 | -------------------- | -------------------------------------------------------- |
 | `pnpm build`         | Bundle `src/*.ts` → `dist/` (IIFE files Chrome loads)    |
+| `pnpm build:firefox` | Build + stage the Firefox package in `build/firefox/`    |
+| `pnpm lint:firefox`  | `web-ext lint` the Firefox package (AMO validation)      |
+| `pnpm run:firefox`   | Launch Firefox 128+ with the extension (`web-ext run`)   |
 | `pnpm typecheck`     | `tsc --noEmit` strict type-check                          |
 | `pnpm test`          | Run the vitest suite against the fixture exports          |
 | `pnpm validate:exports` | Lint real exports dropped in `tmp/exports/` for bad data |
@@ -196,6 +213,7 @@ inject.ts (page MAIN world) → content.ts (content script) → background.ts (s
 ├── tsconfig.json                # strict TypeScript config
 ├── vitest.config.ts             # node-env test config
 ├── scripts/
+│   ├── build-firefox.mjs        # derive the Firefox (AMO) package from dist/
 │   ├── sync-schema.mjs          # cross-repo schema sync / drift gate
 │   ├── anonymize-export.mjs     # scrub a raw capture into a safe fixture
 │   └── validate-export.ts       # integrity linter for real exports (tmp/exports/)

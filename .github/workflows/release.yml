@@ -30,7 +30,7 @@ jobs:
           VERSION=$(jq -r '.version' manifest.json)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Build zip
+      - name: Build Chrome zip
         run: |
           zip -r kops-filter-exporter-v${{ steps.version.outputs.version }}.zip \
             dist/ \
@@ -40,15 +40,28 @@ jobs:
             LICENSE \
             -x "*.git*"
 
+      - name: Build Firefox zip
+        run: |
+          mise exec -- node scripts/build-firefox.mjs
+          cd build/firefox
+          zip -r ../../kops-filter-exporter-firefox-v${{ steps.version.outputs.version }}.zip . -x "*.git*"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: "Kops Filter Exporter v${{ steps.version.outputs.version }}"
           body: |
-            ## Installation
+            ## Install on Chrome
             1. Download `kops-filter-exporter-v${{ steps.version.outputs.version }}.zip` below
             2. Unzip the archive
             3. Open `chrome://extensions` → enable **Developer mode**
             4. Click **Load unpacked** → select the unzipped folder
-          files: kops-filter-exporter-v${{ steps.version.outputs.version }}.zip
+
+            ## Install on Firefox (temporary — requires Firefox 128+)
+            1. Download `kops-filter-exporter-firefox-v${{ steps.version.outputs.version }}.zip` below
+            2. Open `about:debugging#/runtime/this-firefox`
+            3. Click **Load Temporary Add-on** → select the zip
+          files: |
+            kops-filter-exporter-v${{ steps.version.outputs.version }}.zip
+            kops-filter-exporter-firefox-v${{ steps.version.outputs.version }}.zip
           generate_release_notes: true
