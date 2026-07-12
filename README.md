@@ -120,8 +120,7 @@ The Firefox build is derived from the same source — it needs an event-page bac
 - **From source:**
   ```bash
   pnpm install
-  pnpm build:firefox     # builds dist/ then stages build/firefox/
-  pnpm run:firefox       # launches Firefox with the extension loaded
+  pnpm run:firefox       # builds, stages build/firefox/, and launches Firefox
   ```
 
 > Requires **Firefox 128+** — the MAIN-world content script the extension relies on landed in Firefox 128. See `FIREFOX_STORE_GUIDE.md` to publish on Firefox Add-ons (AMO).
