@@ -30,6 +30,19 @@ jobs:
           VERSION=$(jq -r '.version' manifest.json)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
+      - name: Ensure zip is available (ARC runners are minimal)
+        run: |
+          if command -v zip >/dev/null 2>&1; then exit 0; fi
+          SUDO=""
+          if command -v sudo >/dev/null 2>&1; then SUDO="sudo"; fi
+          if command -v apt-get >/dev/null 2>&1; then
+            $SUDO apt-get update && $SUDO apt-get install -y zip
+          elif command -v apk >/dev/null 2>&1; then
+            $SUDO apk add --no-cache zip
+          else
+            echo "::error::no apt-get/apk available to install zip"; exit 1
+          fi
+
       - name: Build zip
         run: |
           zip -r kops-filter-exporter-v${{ steps.version.outputs.version }}.zip \
