@@ -64,6 +64,11 @@ The export is a typed envelope whose schema is the **single source of truth**, g
       "video_game_platform_ids": [],
       "video_game_rating_ids": [],
       "isbn_list": [],
+      "model_ids": [4041, 4042],       // Vinted brand_collection (phone model) ids
+      "model_names": [],               // Souk supplies these; V-Tools sends id-only (Kops resolves)
+      "storage_names": ["128 Go", "256 Go"],
+      "sim_locks": ["Non"],            // SIM-lock value text
+      "battery_health_buckets": [],    // no Vinted facet — settable in Kops only
       "keyword_rules": {               // groups are AND'd; keywords within a group are OR'd
         "groups": [
           { "keywords": ["alpha", "bravo"] },
@@ -146,7 +151,7 @@ CI runs `pnpm verify:schema`, which diffs the vendored file against
 
 ### Test fixtures & anonymization
 
-The committed `fixtures/*.json` are **fully synthetic** — no real account data — and split the parser scenarios into named files (`souk-keyword-groups`, `souk-legacy-search-text`, `vtools-keyword-operators`, `vtools-facets`).
+The committed `fixtures/*.json` are **fully synthetic** — no real account data — and split the parser scenarios into named files (`souk-keyword-groups`, `souk-legacy-search-text`, `vtools-keyword-operators`, `vtools-facets`, `vtools-phone`).
 
 Real captures (`example_*.json`) are **gitignored**. To turn one into a safe fixture, run the anonymizer: it deterministically strips every account identifier (`user_id`, `client_id`, alert/filter IDs, timestamps), replaces names and keyword terms with synthetic tokens, and genericizes brand/model titles, while preserving structure so the output still exercises every parser path:
 
