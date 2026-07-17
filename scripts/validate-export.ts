@@ -241,6 +241,8 @@ function isEmptyHusk(f: ExportedFilter): boolean {
     f.status_ids, f.color_ids, f.color_names, f.material_ids, f.material_names,
     f.country_ids, f.region_isos, f.video_game_platform_ids,
     f.video_game_rating_ids, f.isbn_list, f.blacklist_keywords,
+    f.model_ids, f.model_names, f.storage_names, f.sim_locks,
+    f.battery_health_buckets,
   ];
   const noArrays = arrays.every((a) => a.length === 0);
   const noKeywords = f.keyword_rules === null || f.keyword_rules.groups.length === 0;
@@ -335,6 +337,7 @@ function checkFilter(
   checkIdArray(f.country_ids, 'country_ids', push);
   checkIdArray(f.video_game_platform_ids, 'video_game_platform_ids', push);
   checkIdArray(f.video_game_rating_ids, 'video_game_rating_ids', push);
+  checkIdArray(f.model_ids, 'model_ids', push);
 
   // Price sanity
   if (f.price_min != null && f.price_min < 0) {

@@ -77,6 +77,9 @@ describe('Souk normalizer (keyword groups + facets)', () => {
     expect(a.price_max).toBe(20);
     expect(a.country_ids.length).toBeGreaterThan(0);
     expect(a.region_isos).toEqual([]);
+    // Phone: Souk exposes `models` (id + title) on the phone alert.
+    expect(a.model_ids).toEqual([2002]);
+    expect(a.model_names).toEqual(['Sample Model']);
   });
 
   it('emits null keyword_rules and omits price when an alert has neither', () => {
@@ -157,6 +160,30 @@ describe('V-Tools V2 normalizer (keyword operators + regions)', () => {
 
   it('resolves region IDs to ISO codes, raw-id fallback for unknowns', () => {
     expect(f.region_isos).toEqual(['FR', 'reg_unknown_future']);
+  });
+
+  it('produces a valid export envelope', () => {
+    expectValidEnvelope(filters, 'vtools');
+  });
+});
+
+describe('V-Tools V2 normalizer (phone dimensions, fixture)', () => {
+  const { filters, errors } = normalizeVToolsV2Response(loadFixture('vtools-phone.json'));
+
+  it('parses the phone filter without fatal errors', () => {
+    expect(errors).toEqual([]);
+    expect(filters).toHaveLength(1);
+  });
+
+  it('extracts model/storage/sim from the phone-catalog components', () => {
+    const f = filters[0];
+    expect(f.catalog_ids).toEqual([3661]);
+    expect(f.model_ids).toEqual([4041, 4042]);
+    expect(f.model_names).toEqual([]); // V-Tools brand_collection titles are empty
+    expect(f.storage_names).toEqual(['128 Go', '256 Go']);
+    expect(f.sim_locks).toEqual(['Non', 'Oui']);
+    expect(f.battery_health_buckets).toEqual([]);
+    expect(f.region_isos).toEqual(['FR']);
   });
 
   it('produces a valid export envelope', () => {

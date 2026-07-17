@@ -117,6 +117,11 @@ function emptyExportedFilter(name: string): ExportedFilter {
     video_game_platform_ids: [],
     video_game_rating_ids: [],
     isbn_list: [],
+    model_ids: [],
+    model_names: [],
+    storage_names: [],
+    sim_locks: [],
+    battery_health_buckets: [],
     keyword_rules: null,
     blacklist_keywords: [],
   };
@@ -226,6 +231,11 @@ export function normalizeSoukFilter(alert: unknown): ExportedFilter | null {
   filter.material_names = stringLabels(a.materials, 'title');
   filter.status_ids = numberIds(a.status);
   filter.video_game_platform_ids = numberIds(a.video_game_platforms);
+  // Phone (catalog 3661): Souk exposes `models` as { id, title }, so both the ids
+  // and the display names carry through. Souk does NOT expose storage / SIM-lock /
+  // battery, so those inherit [] from emptyExportedFilter.
+  filter.model_ids = numberIds(a.models);
+  filter.model_names = stringLabels(a.models, 'title');
   filter.isbn_list = toIsbnList(a.isbns);
   // Souk scopes by country_ids, not regions; no video-game ratings exposed.
   filter.region_isos = [];
@@ -392,6 +402,14 @@ export function normalizeVToolsV2Filter(filter: unknown): ExportedFilter | null 
 
   out.video_game_platform_ids = numberIds(valueOf('video_game_platform'), 'value');
   out.video_game_rating_ids = numberIds(valueOf('video_game_rating'), 'value');
+
+  // Phone (catalog 3661): model is the `brand_collection` component (id-only — V-Tools
+  // sends empty titles, so model_names stays [] and Kops resolves the display name);
+  // storage is `internal_memory_capacity` and SIM-lock is `sim_lock`, both carrying
+  // value text in `title`. No battery facet exists → battery_health_buckets stays [].
+  out.model_ids = numberIds(valueOf('brand_collection'), 'value');
+  out.storage_names = stringLabels(valueOf('internal_memory_capacity'), 'title');
+  out.sim_locks = stringLabels(valueOf('sim_lock'), 'title');
 
   // Regions: plain string IDs resolved to ISO codes (fallback: raw ID).
   out.region_isos = asArray<unknown>(valueOf('region'))
