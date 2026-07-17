@@ -35,6 +35,11 @@ function validFilter(overrides: Record<string, unknown> = {}): Record<string, un
     video_game_platform_ids: [],
     video_game_rating_ids: [],
     isbn_list: [],
+    model_ids: [],
+    model_names: [],
+    storage_names: [],
+    sim_locks: [],
+    battery_health_buckets: [],
     keyword_rules: null,
     blacklist_keywords: [],
     ...overrides,
@@ -109,6 +114,21 @@ describe('exportedFilterSchema', () => {
     expect(() => exportedFilterSchema.parse(validFilter())).not.toThrow();
     expect(() => exportedFilterSchema.parse(validFilter({ price_min: 5, price_max: 50 }))).not.toThrow();
     expect(() => exportedFilterSchema.parse(validFilter({ price_min: 'cheap' }))).toThrow();
+  });
+
+  it('accepts phone dimensions (model ids/names, storage, sim, battery)', () => {
+    const f = validFilter({
+      model_ids: [4042],
+      model_names: ['iPhone 11 Pro'],
+      storage_names: ['128 Go'],
+      sim_locks: ['Non'],
+      battery_health_buckets: ['85-89 %'],
+    });
+    expect(() => exportedFilterSchema.parse(f)).not.toThrow();
+  });
+
+  it('rejects a non-number model id', () => {
+    expect(() => exportedFilterSchema.parse(validFilter({ model_ids: ['4042'] }))).toThrow();
   });
 
   it('rejects a non-string keyword inside a group', () => {

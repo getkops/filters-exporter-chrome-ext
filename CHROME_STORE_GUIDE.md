@@ -69,7 +69,7 @@ Kops Filter Exporter is a free, open-source Chrome extension that captures your 
 
 • Automatic capture — Just visit your V-Tools or Souk.to filters page. The extension silently intercepts the API response (and paginates it for you). No clicks needed.
 
-• Typed JSON export — One versioned format for both services. Includes filter names, keyword rules (AND/OR groups + blacklist), price ranges, catalogs, brands, sizes, statuses, colors, materials, countries/regions, ISBNs, and enabled/autocop state.
+• Typed JSON export — One versioned format for both services. Includes filter names, keyword rules (AND/OR groups + blacklist), price ranges, catalogs, brands, sizes, statuses, colors, materials, countries/regions, ISBNs, phone attributes (model, storage, SIM-lock), and enabled/autocop state.
 
 • Vinted IDs included — Every facet (brands, catalogs, sizes, etc.) carries the corresponding Vinted IDs alongside human-readable names, ready for programmatic import into Kops.
 

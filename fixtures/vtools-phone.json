@@ -1,0 +1,66 @@
+{
+  "success": true,
+  "data": {
+    "list": [
+      {
+        "alert": false,
+        "boosted": false,
+        "client_id": "clt_example",
+        "components": [
+          {
+            "operator": "contains",
+            "type": "catalog",
+            "value": [{ "title": "Téléphones portables", "value": 3661 }]
+          },
+          {
+            "operator": "contains",
+            "type": "brand",
+            "value": [{ "title": "Apple", "value": 54661 }]
+          },
+          {
+            "operator": "contains",
+            "type": "brand_collection",
+            "value": [
+              { "title": "", "value": 4041 },
+              { "title": "", "value": 4042 }
+            ]
+          },
+          {
+            "operator": "contains",
+            "type": "internal_memory_capacity",
+            "value": [
+              { "title": "128 Go", "value": 1305 },
+              { "title": "256 Go", "value": 1306 }
+            ]
+          },
+          {
+            "operator": "contains",
+            "type": "sim_lock",
+            "value": [
+              { "title": "Non", "value": 1312 },
+              { "title": "Oui", "value": 1313 }
+            ]
+          },
+          {
+            "operator": "between",
+            "type": "price",
+            "value": { "max": 0, "min": 0, "unit": "eur" }
+          },
+          {
+            "operator": "contains",
+            "type": "region",
+            "value": ["reg_IezcaEzJsV7i80r1tt4EK"]
+          }
+        ],
+        "created_at": 1577836800,
+        "enabled": true,
+        "filter_id": "flt_phone",
+        "label_ids": [],
+        "labels": [],
+        "name": "Example phone filter",
+        "updated_at": 1577836800
+      }
+    ],
+    "pagination": { "per_page": 20, "total_entries": 1, "total_pages": 1 }
+  }
+}

@@ -39,6 +39,11 @@ export const exportedFilterSchema = z.object({
     video_game_platform_ids: z.array(z.number()),
     video_game_rating_ids: z.array(z.number()),
     isbn_list: z.array(z.string()),
+    model_ids: z.array(z.number()),
+    model_names: z.array(z.string()),
+    storage_names: z.array(z.string()),
+    sim_locks: z.array(z.string()),
+    battery_health_buckets: z.array(z.string()),
     keyword_rules: z.lazy(() => keywordRulesSchema).nullable(),
     blacklist_keywords: z.array(z.string()),
 });

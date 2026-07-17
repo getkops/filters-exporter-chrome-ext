@@ -161,6 +161,32 @@ describe('V-Tools V2 facets', () => {
   });
 });
 
+describe('V-Tools V2 phone dimensions (catalog 3661)', () => {
+  it('extracts model_ids from brand_collection + storage/sim from title; battery stays empty', () => {
+    const f = withComponents(
+      comp('contains', 'catalog', [{ title: 'Téléphones portables', value: 3661 }]),
+      comp('contains', 'brand_collection', [{ title: '', value: 4041 }, { title: '', value: 4042 }]),
+      comp('contains', 'internal_memory_capacity', [{ title: '128 Go', value: 1305 }, { title: '256 Go', value: 1306 }]),
+      comp('contains', 'sim_lock', [{ title: 'Non', value: 1312 }, { title: 'Oui', value: 1313 }]),
+    );
+    expect(f.model_ids).toEqual([4041, 4042]);
+    // V-Tools sends empty model titles → model_names stays [] (Kops resolves by id).
+    expect(f.model_names).toEqual([]);
+    expect(f.storage_names).toEqual(['128 Go', '256 Go']);
+    expect(f.sim_locks).toEqual(['Non', 'Oui']);
+    expect(f.battery_health_buckets).toEqual([]);
+  });
+
+  it('leaves every phone dimension empty when no phone components are present', () => {
+    const f = withComponents(comp('contains', 'keyword', ['alpha']));
+    expect(f.model_ids).toEqual([]);
+    expect(f.model_names).toEqual([]);
+    expect(f.storage_names).toEqual([]);
+    expect(f.sim_locks).toEqual([]);
+    expect(f.battery_health_buckets).toEqual([]);
+  });
+});
+
 describe('V-Tools V2 regions', () => {
   it('resolves known region IDs to ISO codes', () => {
     const f = withComponents(comp('contains', 'region', ['reg_IezcaEzJsV7i80r1tt4EK']));
