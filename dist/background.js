@@ -4071,6 +4071,11 @@
     video_game_platform_ids: external_exports.array(external_exports.number()),
     video_game_rating_ids: external_exports.array(external_exports.number()),
     isbn_list: external_exports.array(external_exports.string()),
+    model_ids: external_exports.array(external_exports.number()),
+    model_names: external_exports.array(external_exports.string()),
+    storage_names: external_exports.array(external_exports.string()),
+    sim_locks: external_exports.array(external_exports.string()),
+    battery_health_buckets: external_exports.array(external_exports.string()),
     keyword_rules: external_exports.lazy(() => keywordRulesSchema).nullable(),
     blacklist_keywords: external_exports.array(external_exports.string())
   });
@@ -4158,6 +4163,11 @@
       video_game_platform_ids: [],
       video_game_rating_ids: [],
       isbn_list: [],
+      model_ids: [],
+      model_names: [],
+      storage_names: [],
+      sim_locks: [],
+      battery_health_buckets: [],
       keyword_rules: null,
       blacklist_keywords: []
     };
@@ -4213,6 +4223,8 @@
     filter.material_names = stringLabels(a.materials, "title");
     filter.status_ids = numberIds(a.status);
     filter.video_game_platform_ids = numberIds(a.video_game_platforms);
+    filter.model_ids = numberIds(a.models);
+    filter.model_names = stringLabels(a.models, "title");
     filter.isbn_list = toIsbnList(a.isbns);
     filter.region_isos = [];
     filter.video_game_rating_ids = [];
@@ -4317,6 +4329,9 @@
     out.country_ids = numberIds(valueOf("country"), "value");
     out.video_game_platform_ids = numberIds(valueOf("video_game_platform"), "value");
     out.video_game_rating_ids = numberIds(valueOf("video_game_rating"), "value");
+    out.model_ids = numberIds(valueOf("brand_collection"), "value");
+    out.storage_names = stringLabels(valueOf("internal_memory_capacity"), "title");
+    out.sim_locks = stringLabels(valueOf("sim_lock"), "title");
     out.region_isos = asArray(valueOf("region")).map((id) => String(id)).map((id) => VTOOLSV2_REGIONS[id] ?? id);
     const priceVal = valueOf("price");
     applyPrice(out, priceVal?.min, priceVal?.max);

@@ -122,6 +122,7 @@ describe('Souk facets', () => {
       materials: [{ id: 44, title: 'Cotton' }, { id: 45, title: 'Polyester' }],
       status: [{ id: 3, title: 'Good' }],
       video_game_platforms: [{ id: 9, title: 'Platform' }],
+      models: [{ id: 4042, title: 'iPhone 11 Pro' }],
     });
     expect(f.country_ids).toEqual([16, 2]);
     expect(f.catalog_ids).toEqual([3661]);
@@ -136,6 +137,12 @@ describe('Souk facets', () => {
     // Souk scopes by country, never region; it exposes no video-game ratings.
     expect(f.region_isos).toEqual([]);
     expect(f.video_game_rating_ids).toEqual([]);
+    // Phone: Souk exposes models (id + title); it has no storage / SIM / battery facet.
+    expect(f.model_ids).toEqual([4042]);
+    expect(f.model_names).toEqual(['iPhone 11 Pro']);
+    expect(f.storage_names).toEqual([]);
+    expect(f.sim_locks).toEqual([]);
+    expect(f.battery_health_buckets).toEqual([]);
   });
 
   it('drops a facet entry with a non-numeric/missing id (keeps brand_ids ahead of names)', () => {

@@ -134,6 +134,13 @@ function anonymizeVTools(resp) {
         if (c.type === 'brand' && Array.isArray(c.value)) {
           return { ...c, value: genericizeTitles(c.value, 'Brand', 'value') };
         }
+        // brand_collection = phone MODEL: reflects the account's specific interest,
+        // so genericize its titles like brand (keep numeric ids). storage/sim titles
+        // (internal_memory_capacity / sim_lock) are public spec enums — kept, like
+        // catalog/color/status.
+        if (c.type === 'brand_collection' && Array.isArray(c.value)) {
+          return { ...c, value: genericizeTitles(c.value, 'Model', 'value') };
+        }
         return c;
       });
     }
