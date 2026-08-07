@@ -19,7 +19,7 @@
 1. Go to **[Chrome Developer Dashboard](https://chrome.google.com/webstore/devconsole)**
 2. Sign in with a Google account (use your Kops business account)
 3. Pay the **$5 one-time registration fee**
-4. Fill in developer info (name, email, website: `https://getkops.com`)
+4. Fill in developer info (name, email, website: `https://kops.gg`)
 
 ---
 
@@ -88,7 +88,7 @@ Kops Filter Exporter is a free, open-source Chrome extension that captures your 
 2. Navigate to your V-Tools or Souk.to filters page
 3. The extension badge shows the number of captured filters
 4. Click the extension icon → Export JSON
-5. Import the JSON into Kops (getkops.com) to recreate your filters instantly
+5. Import the JSON into Kops (kops.gg) to recreate your filters instantly
 
 🔒 PRIVACY
 
@@ -100,7 +100,7 @@ Kops Filter Exporter is fully open-source under the MIT license.
 Source code: https://github.com/getkops/filters-exporter-chrome-ext
 
 Built with ♥ by Kops — the fastest Vinted items monitor on the market.
-https://getkops.com
+https://kops.gg
 ```
 
 ### Category
@@ -151,7 +151,7 @@ The `PRIVACY_POLICY.md` is already in the repo. Use this URL:
 https://github.com/getkops/filters-exporter-chrome-ext/blob/main/PRIVACY_POLICY.md
 ```
 
-**Option B — getkops.com:**
+**Option B — kops.gg:**
 Add a `/privacy-filter-exporter` page on your website and paste the content of `PRIVACY_POLICY.md`.
 
 ---

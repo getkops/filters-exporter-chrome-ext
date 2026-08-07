@@ -4,7 +4,7 @@
   "version": "2.2.0",
   "description": "__MSG_appDesc__",
   "default_locale": "en",
-  "homepage_url": "https://getkops.com",
+  "homepage_url": "https://kops.gg",
   "author": "Kops",
   "permissions": [
     "storage",

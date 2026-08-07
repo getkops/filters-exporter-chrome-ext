@@ -7,7 +7,7 @@
 <p align="center">
   <strong>Chrome extension (MV3) that extracts filters from V-Tools &amp; Souk.to and exports them as a typed JSON envelope for import into Kops</strong>
   <br />
-  <em>Open-source tool by <a href="https://getkops.com">Kops</a> — the fastest Vinted items monitor on the market</em>
+  <em>Open-source tool by <a href="https://kops.gg">Kops</a> — the fastest Vinted items monitor on the market</em>
 </p>
 
 <p align="center">
@@ -23,7 +23,7 @@
 
 ## What it does
 
-Kops Filter Exporter silently intercepts the filters/alerts API responses when you visit V-Tools or Souk.to dashboards, normalizes them into a **typed, versioned JSON envelope**, and lets you download everything as a single `.json` file ready to import into [Kops](https://getkops.com).
+Kops Filter Exporter silently intercepts the filters/alerts API responses when you visit V-Tools or Souk.to dashboards, normalizes them into a **typed, versioned JSON envelope**, and lets you download everything as a single `.json` file ready to import into [Kops](https://kops.gg).
 
 > **v2.0.0** replaced the old lossy CSV export with a typed JSON envelope. CSV could not represent keyword groups (AND/OR logic); the JSON contract can. Legacy **V-Tools V1** is no longer supported.
 
@@ -227,4 +227,4 @@ Contributions are welcome! Feel free to open issues or submit pull requests. Run
 
 ## License
 
-MIT — Made with ♥ by [Kops](https://getkops.com)
+MIT — Made with ♥ by [Kops](https://kops.gg)

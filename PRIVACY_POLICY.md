@@ -4,7 +4,7 @@
 
 ## Overview
 
-Kops Filter Exporter is a Chrome extension developed by [Kops](https://getkops.com) that extracts filter configurations from V-Tools and Souk.to dashboards and exports them as a typed JSON file.
+Kops Filter Exporter is a Chrome extension developed by [Kops](https://kops.gg) that extracts filter configurations from V-Tools and Souk.to dashboards and exports them as a typed JSON file.
 
 ## Data Collection
 
@@ -54,5 +54,5 @@ If we make changes to this privacy policy, we will update the "Last updated" dat
 
 If you have any questions about this privacy policy, please contact us at:
 
-- Website: [https://getkops.com](https://getkops.com)
+- Website: [https://kops.gg](https://kops.gg)
 - GitHub: [https://github.com/getkops/filters-exporter-chrome-ext](https://github.com/getkops/filters-exporter-chrome-ext)
