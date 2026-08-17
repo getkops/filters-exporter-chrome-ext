@@ -20,6 +20,7 @@ export function makeFilter(overrides: Partial<ExportedFilter> = {}): ExportedFil
     region_isos: [],
     video_game_platform_ids: [],
     video_game_rating_ids: [],
+    video_game_rating_names: [],
     isbn_list: [],
     model_ids: [],
     model_names: [],

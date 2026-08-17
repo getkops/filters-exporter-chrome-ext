@@ -4075,6 +4075,7 @@
     region_isos: external_exports.array(external_exports.string()).default([]),
     video_game_platform_ids: external_exports.array(external_exports.number()).default([]),
     video_game_rating_ids: external_exports.array(external_exports.number()).default([]),
+    video_game_rating_names: external_exports.array(external_exports.string()).default([]),
     isbn_list: external_exports.array(external_exports.string()).default([]),
     model_ids: external_exports.array(external_exports.number()).default([]),
     model_names: external_exports.array(external_exports.string()).default([]),
@@ -4167,6 +4168,10 @@
       region_isos: [],
       video_game_platform_ids: [],
       video_game_rating_ids: [],
+      // Rating LABELS, for a source that exposes them instead of Vinted's numeric
+      // ids (Kops resolves them on import). Neither V-Tools nor Souk does — both
+      // send ids — so this stays empty here and exists for contract completeness.
+      video_game_rating_names: [],
       isbn_list: [],
       model_ids: [],
       model_names: [],
