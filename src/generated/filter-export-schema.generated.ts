@@ -43,6 +43,7 @@ export const exportedFilterSchema = z.object({
     region_isos: z.array(z.string()).default([]),
     video_game_platform_ids: z.array(z.number()).default([]),
     video_game_rating_ids: z.array(z.number()).default([]),
+    video_game_rating_names: z.array(z.string()).default([]),
     isbn_list: z.array(z.string()).default([]),
     model_ids: z.array(z.number()).default([]),
     model_names: z.array(z.string()).default([]),

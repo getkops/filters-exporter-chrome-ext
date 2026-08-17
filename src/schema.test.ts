@@ -119,6 +119,20 @@ describe('validateFilterExport', () => {
     expect(() => validateFilterExport(validEnvelope([validFilter({ seller_rating_min: 'high' })]))).toThrow();
   });
 
+  it('accepts video-game rating LABELS alongside the ids', () => {
+    // For a source that exposes "PEGI 3" rather than Vinted's numeric id. Kops
+    // resolves the label to an id on import; neither V-Tools nor Souk needs it
+    // (both send ids), so this extension always emits it empty.
+    const f = validFilter({ video_game_rating_names: ['PEGI 3', 'PEGI 18'] });
+    const parsed = validateFilterExport(validEnvelope([f]));
+    expect(parsed.filters[0].video_game_rating_names).toEqual(['PEGI 3', 'PEGI 18']);
+  });
+
+  it('defaults the rating labels to [] when an older export omits them', () => {
+    const parsed = validateFilterExport(validEnvelope([validFilter()]));
+    expect(parsed.filters[0].video_game_rating_names).toEqual([]);
+  });
+
   it('accepts an empty filters array (the SCHEMA allows it; the server enforces non-empty)', () => {
     // The Zod contract is structural; "at least one filter" is a server policy
     // (ParseExportFilters returns 400), not a schema rule. Locking this keeps the

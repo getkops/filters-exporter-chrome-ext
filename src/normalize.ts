@@ -116,6 +116,10 @@ function emptyExportedFilter(name: string): ExportedFilter {
     region_isos: [],
     video_game_platform_ids: [],
     video_game_rating_ids: [],
+    // Rating LABELS, for a source that exposes them instead of Vinted's numeric
+    // ids (Kops resolves them on import). Neither V-Tools nor Souk does — both
+    // send ids — so this stays empty here and exists for contract completeness.
+    video_game_rating_names: [],
     isbn_list: [],
     model_ids: [],
     model_names: [],
