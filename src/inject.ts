@@ -16,7 +16,13 @@
  */
 
 import { matchAdapter, paginateAll, type AnyAdapter } from './paginate';
-import { shapeOf, urlParamKeys, DIAG_MSG_TYPE, type DiagSink } from './diagnostics';
+import {
+  shapeOf,
+  urlParamKeys,
+  isApiErrorPayload,
+  DIAG_MSG_TYPE,
+  type DiagSink,
+} from './diagnostics';
 
 (function () {
   'use strict';
@@ -138,10 +144,18 @@ import { shapeOf, urlParamKeys, DIAG_MSG_TYPE, type DiagSink } from './diagnosti
     // only its structure (keys + types, no values) reaches the debug buffer.
     const parsed = adapter.parse(interceptedJson);
     if (!parsed) {
+      // An explicit error envelope is a transient the app retries (and the retry
+      // is what gets captured), so it is a warning — reserving `error` for a body
+      // we genuinely could not read keeps a healthy capture from reading as a
+      // failure in a support bundle.
+      const apiError = isApiErrorPayload(interceptedJson);
       diag({
         stage: 'parse_fail',
         source: adapter.source,
-        message: 'intercepted body was not a usable success payload',
+        level: apiError ? 'warn' : 'error',
+        message: apiError
+          ? 'the API returned an error payload, not a filter list — waiting for the app to retry'
+          : 'intercepted body was not a usable success payload',
         detail: { shape: JSON.stringify(shapeOf(interceptedJson)) },
       });
       return;

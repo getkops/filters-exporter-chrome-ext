@@ -52,6 +52,7 @@ The export is a typed envelope whose schema is the **single source of truth**, g
       "autocop": false,
       "price_min": 2,                  // omitted when 0/absent
       "price_max": 20,
+      "exclude_business_sellers": true, // optional; only emitted when the source sets it
       "catalog_ids": [3661],
       "brand_ids": [1001],
       "brand_names": ["Sample Brand"],

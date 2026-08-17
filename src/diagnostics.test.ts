@@ -4,6 +4,7 @@ import {
   redactKey,
   sanitizeUrl,
   urlParamKeys,
+  isApiErrorPayload,
   shapeOf,
   pushEvent,
   toEvent,
@@ -213,5 +214,28 @@ describe('assembleDebugBundle', () => {
 
     const withFilters = { ...baseInput(), filters: [{ name: 'f' }] };
     expect(assembleDebugBundle(withFilters).filters).toEqual([{ name: 'f' }]);
+  });
+});
+
+describe('isApiErrorPayload', () => {
+  it('recognizes the V-Tools and Souk error envelopes', () => {
+    expect(isApiErrorPayload({ success: false, message: 'nope' })).toBe(true);
+    expect(isApiErrorPayload({ type: 'error', body: null })).toBe(true);
+  });
+
+  it('recognizes a populated errors array', () => {
+    expect(isApiErrorPayload({ errors: [{ message: 'Unauthorized' }], data: null })).toBe(true);
+  });
+
+  it('does not flag a success payload or an empty errors array', () => {
+    expect(isApiErrorPayload({ success: true, data: { list: [] } })).toBe(false);
+    expect(isApiErrorPayload({ type: 'success', body: { alerts: [] } })).toBe(false);
+    expect(isApiErrorPayload({ errors: [] })).toBe(false);
+  });
+
+  it('does not flag a non-object', () => {
+    expect(isApiErrorPayload(null)).toBe(false);
+    expect(isApiErrorPayload('errors')).toBe(false);
+    expect(isApiErrorPayload([])).toBe(false);
   });
 });

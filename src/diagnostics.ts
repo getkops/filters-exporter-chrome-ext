@@ -137,6 +137,31 @@ export function urlParamKeys(url: string): string {
   }
 }
 
+// ─── Error-payload detection ───────────────────────────────────────
+
+/**
+ * True when a body is an explicit API ERROR envelope rather than a shape we
+ * failed to understand.
+ *
+ * Both make `adapter.parse` return null, but they mean very different things: an
+ * error envelope is usually TRANSIENT — an expired session on first paint, a
+ * rate limit — and the app retries seconds later, which is the response we
+ * actually capture. Logging that at error level makes a perfectly successful
+ * capture read as a failure in a support bundle, which is worse than useless: it
+ * sends whoever reads it hunting a bug that is not there.
+ *
+ * Covers the shapes our sources use to say "no": `success: false` (V-Tools),
+ * `type: 'error'` (Souk), and a populated top-level `errors` array.
+ */
+export function isApiErrorPayload(json: unknown): boolean {
+  if (!json || typeof json !== 'object') return false;
+  const body = json as Record<string, unknown>;
+  if (Array.isArray(body.errors) && body.errors.length > 0) return true;
+  if (body.success === false) return true;
+  if (body.type === 'error') return true;
+  return false;
+}
+
 // ─── Shape extraction (keys + types, never values) ─────────────────
 
 const MAX_SHAPE_DEPTH = 5;

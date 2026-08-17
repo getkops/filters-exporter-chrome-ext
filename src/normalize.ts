@@ -218,6 +218,11 @@ export function normalizeSoukFilter(alert: unknown): ExportedFilter | null {
   filter.enabled = a.is_deactivated !== true;
   filter.autocop = false;
 
+  // Seller quality: Souk carries this flag on every alert. Only set when TRUE —
+  // the contract field is optional, so an untouched filter serializes exactly as
+  // it did before this field existed.
+  if (a.exclude_business_sellers === true) filter.exclude_business_sellers = true;
+
   // Facets (Souk uses `title` for labels, `id` for IDs)
   filter.country_ids = numberIds(a.countries);
   filter.catalog_ids = numberIds(a.catalogs);

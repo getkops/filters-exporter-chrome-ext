@@ -4056,40 +4056,45 @@
     autocop: external_exports.boolean(),
     price_min: external_exports.number().optional(),
     price_max: external_exports.number().optional(),
-    catalog_ids: external_exports.array(external_exports.number()),
-    brand_ids: external_exports.array(external_exports.number()),
-    brand_names: external_exports.array(external_exports.string()),
-    size_ids: external_exports.array(external_exports.number()),
-    size_names: external_exports.array(external_exports.string()),
-    status_ids: external_exports.array(external_exports.number()),
-    color_ids: external_exports.array(external_exports.number()),
-    color_names: external_exports.array(external_exports.string()),
-    material_ids: external_exports.array(external_exports.number()),
-    material_names: external_exports.array(external_exports.string()),
-    country_ids: external_exports.array(external_exports.number()),
-    region_isos: external_exports.array(external_exports.string()),
-    video_game_platform_ids: external_exports.array(external_exports.number()),
-    video_game_rating_ids: external_exports.array(external_exports.number()),
-    isbn_list: external_exports.array(external_exports.string()),
-    model_ids: external_exports.array(external_exports.number()),
-    model_names: external_exports.array(external_exports.string()),
-    storage_names: external_exports.array(external_exports.string()),
-    sim_locks: external_exports.array(external_exports.string()),
-    battery_health_buckets: external_exports.array(external_exports.string()),
+    seller_rating_min: external_exports.number().optional(),
+    seller_eval_count_min: external_exports.number().optional(),
+    exclude_business_sellers: external_exports.boolean().optional(),
+    keywords_title_only: external_exports.boolean().optional(),
+    blacklist_title_only: external_exports.boolean().optional(),
+    catalog_ids: external_exports.array(external_exports.number()).default([]),
+    brand_ids: external_exports.array(external_exports.number()).default([]),
+    brand_names: external_exports.array(external_exports.string()).default([]),
+    size_ids: external_exports.array(external_exports.number()).default([]),
+    size_names: external_exports.array(external_exports.string()).default([]),
+    status_ids: external_exports.array(external_exports.number()).default([]),
+    color_ids: external_exports.array(external_exports.number()).default([]),
+    color_names: external_exports.array(external_exports.string()).default([]),
+    material_ids: external_exports.array(external_exports.number()).default([]),
+    material_names: external_exports.array(external_exports.string()).default([]),
+    country_ids: external_exports.array(external_exports.number()).default([]),
+    region_isos: external_exports.array(external_exports.string()).default([]),
+    video_game_platform_ids: external_exports.array(external_exports.number()).default([]),
+    video_game_rating_ids: external_exports.array(external_exports.number()).default([]),
+    isbn_list: external_exports.array(external_exports.string()).default([]),
+    model_ids: external_exports.array(external_exports.number()).default([]),
+    model_names: external_exports.array(external_exports.string()).default([]),
+    storage_names: external_exports.array(external_exports.string()).default([]),
+    sim_locks: external_exports.array(external_exports.string()).default([]),
+    battery_health_buckets: external_exports.array(external_exports.string()).default([]),
     keyword_rules: external_exports.lazy(() => keywordRulesSchema).nullable(),
-    blacklist_keywords: external_exports.array(external_exports.string())
+    blacklist_keywords: external_exports.array(external_exports.string()).default([])
   });
   var filterExportEnvelopeSchema = external_exports.object({
     schema_version: external_exports.number(),
     source: filterExportSourceSchema,
     exported_at: external_exports.string(),
-    filters: external_exports.array(exportedFilterSchema)
+    filters: external_exports.array(exportedFilterSchema).default([])
   });
   var keywordGroupSchema = external_exports.object({
-    keywords: external_exports.array(external_exports.string())
+    keywords: external_exports.array(external_exports.string()).default([])
   });
   var keywordRulesSchema = external_exports.object({
-    groups: external_exports.array(keywordGroupSchema)
+    groups: external_exports.array(keywordGroupSchema).default([])
   });
   var FILTER_EXPORT_SCHEMA_VERSION = 1;
   function validateFilterExport(raw) {
@@ -4211,6 +4216,7 @@
     const filter = emptyExportedFilter(name);
     filter.enabled = a.is_deactivated !== true;
     filter.autocop = false;
+    if (a.exclude_business_sellers === true) filter.exclude_business_sellers = true;
     filter.country_ids = numberIds(a.countries);
     filter.catalog_ids = numberIds(a.catalogs);
     filter.brand_ids = numberIds(a.brands);
