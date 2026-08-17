@@ -44,6 +44,14 @@
       return query.split("&").map((pair) => pair.split("=")[0]).filter(Boolean).join(",");
     }
   }
+  function isApiErrorPayload(json) {
+    if (!json || typeof json !== "object") return false;
+    const body = json;
+    if (Array.isArray(body.errors) && body.errors.length > 0) return true;
+    if (body.success === false) return true;
+    if (body.type === "error") return true;
+    return false;
+  }
   var MAX_SHAPE_DEPTH = 5;
   var MAX_SHAPE_KEYS = 40;
   function shapeOf(value, depth = 0) {
@@ -392,10 +400,12 @@
     async function processAndPost(adapter, url, interceptedJson, requestConfig) {
       const parsed = adapter.parse(interceptedJson);
       if (!parsed) {
+        const apiError = isApiErrorPayload(interceptedJson);
         diag({
           stage: "parse_fail",
           source: adapter.source,
-          message: "intercepted body was not a usable success payload",
+          level: apiError ? "warn" : "error",
+          message: apiError ? "the API returned an error payload, not a filter list \u2014 waiting for the app to retry" : "intercepted body was not a usable success payload",
           detail: { shape: JSON.stringify(shapeOf(interceptedJson)) }
         });
         return;

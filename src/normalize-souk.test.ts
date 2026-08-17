@@ -179,6 +179,25 @@ describe('Souk price', () => {
   });
 });
 
+describe('Souk seller quality', () => {
+  it('carries exclude_business_sellers when the alert sets it', () => {
+    expect(one({ exclude_business_sellers: true }).exclude_business_sellers).toBe(true);
+  });
+
+  it('omits the field when false or absent, so an untouched filter is unchanged', () => {
+    // The contract field is optional, so emitting `false` would add a key to
+    // every envelope the exporter has ever produced for no gain. Absent means
+    // "no constraint", which is exactly what false means here.
+    expect(one({ exclude_business_sellers: false })).not.toHaveProperty('exclude_business_sellers');
+    expect(one({})).not.toHaveProperty('exclude_business_sellers');
+  });
+
+  it('ignores a non-boolean value rather than coercing it', () => {
+    expect(one({ exclude_business_sellers: 'yes' })).not.toHaveProperty('exclude_business_sellers');
+    expect(one({ exclude_business_sellers: 1 })).not.toHaveProperty('exclude_business_sellers');
+  });
+});
+
 describe('Souk lifecycle', () => {
   it('is_deactivated true → disabled', () => {
     expect(one({ is_deactivated: true }).enabled).toBe(false);

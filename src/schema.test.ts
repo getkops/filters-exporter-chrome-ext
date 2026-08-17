@@ -84,9 +84,39 @@ describe('validateFilterExport', () => {
     expect(() => validateFilterExport('a string')).toThrow();
   });
 
-  it('rejects an envelope whose filter is missing a required array field', () => {
+  it('defaults a MISSING array field to [] instead of rejecting it', () => {
+    // The SSOT declares every list as `.default([])`, so an omitted array is a
+    // valid "no constraint" rather than a malformed filter. The extension still
+    // always emits them (emptyExportedFilter), but a hand-written or older
+    // envelope imports cleanly.
     const { brand_ids: _omit, ...withoutBrandIds } = validFilter();
-    expect(() => validateFilterExport(validEnvelope([withoutBrandIds]))).toThrow();
+    const parsed = validateFilterExport(validEnvelope([withoutBrandIds]));
+    expect(parsed.filters[0].brand_ids).toEqual([]);
+  });
+
+  it('still rejects an array field of the wrong type', () => {
+    expect(() => validateFilterExport(validEnvelope([validFilter({ brand_ids: 'nope' })]))).toThrow();
+    expect(() => validateFilterExport(validEnvelope([validFilter({ brand_names: [7] })]))).toThrow();
+  });
+
+  it('accepts the seller-quality and keyword-scope dimensions', () => {
+    // These arrived with a schema sync. The exact names matter: a typo is
+    // STRIPPED by zod rather than rejected, so the criterion would vanish between
+    // export and import with nothing anywhere to show for it.
+    const f = validFilter({
+      seller_rating_min: 4.5,
+      seller_eval_count_min: 30,
+      exclude_business_sellers: true,
+      keywords_title_only: true,
+      blacklist_title_only: false,
+    });
+    const parsed = validateFilterExport(validEnvelope([f]));
+    expect(parsed.filters[0]).toMatchObject({
+      seller_rating_min: 4.5,
+      seller_eval_count_min: 30,
+      exclude_business_sellers: true,
+    });
+    expect(() => validateFilterExport(validEnvelope([validFilter({ seller_rating_min: 'high' })]))).toThrow();
   });
 
   it('accepts an empty filters array (the SCHEMA allows it; the server enforces non-empty)', () => {
